@@ -1,0 +1,19 @@
+.App {
+    font-family: Verdana, Helvetica, sans-serif;
+    box-sizing: border-box;
+    --site-header-height: 40px;
+}
+
+.site-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: start;
+}
+
+button {
+    color: black;
+    background-color: white;
+    padding: 5px;
+    border-radius: 5px;
+    font-family: Verdana, Helvetica, sans-serif;
+}

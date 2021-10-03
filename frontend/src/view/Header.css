@@ -1,0 +1,39 @@
+.site-header {
+    display: flex;
+    height: var(--site-header-height);
+    justify-content: space-between;
+    background-color: gainsboro;
+}
+
+.navigation {
+    display: flex;
+    justify-content: space-between;
+    margin-left: 20px;
+}
+
+.navigation-item {
+    padding: 10px;
+    margin: 0px 1px;
+}
+
+.navigation-item:hover {
+    background-color: white;
+}
+
+.navigation-item-content {
+}
+
+.navigation-item-active {
+}
+
+.user-settings {
+    margin-right: 20px;
+}
+
+.player-name {
+    padding: 10px;
+}
+
+.player-name:hover {
+    background-color: white;
+}

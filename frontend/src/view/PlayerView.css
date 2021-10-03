@@ -1,0 +1,119 @@
+.player-view {
+    display: flex;
+    position: fixed;
+    background-color: #ccc;
+    --my-player-view-small-side: 15%;
+    --opponent-player-view-large-side-vertical: 70%;
+    --my-player-view-large-side-horizontal: 60%;
+    --opponent-player-view-large-side-horizontal: 60%;
+}
+
+.player-view-horizontal {
+    flex-direction: row;
+}
+
+.player-view-vertical {
+    flex-direction: column;
+}
+
+.player-details {
+    display: flex;
+    position: fixed;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-around;
+    background-color: hsl(0, 15%, 90%);
+}
+
+.player-details-vertical {
+    top: 80%;
+    width: 100%;
+    height: 20%;
+}
+
+.player-details-horizontal {
+    left: 80%;
+    width: 20%;
+    height: 100%;
+}
+
+.my-player {
+    left: 50%;
+    bottom: 0%;
+    transform: translateX(-50%);
+    width: var(--my-player-view-large-side-horizontal);
+    height: var(--my-player-view-small-side);
+    /* background-color: #edf7f0; */
+    border-radius: 10px 10px 0px 0px;
+}
+
+.opponent {
+    /* background-color: #f7dfe6; */
+}
+
+.opponent-1 {
+    top: calc(0% + var(--site-header-height));
+    left: 50%;
+    transform: translateX(-50%);
+    width: var(--opponent-player-view-large-side-horizontal);
+    border-radius: 0px 0px 10px 10px;
+}
+
+.opponent-2 {
+    left: 0%;
+    top: 50%;
+    transform: translateY(-50%);
+    height: var(--opponent-player-view-large-side-vertical);
+    border-radius: 0px 10px 10px 0px;
+}
+
+.opponent-3 {
+    top: 50%;
+    right: 0%;
+    transform: translateY(-50%);
+    height: var(--opponent-player-view-large-side-vertical);
+    border-radius: 10px 0px 0px 10px;
+}
+
+.hand-container {
+    display: flex;
+    position: fixed;
+    justify-content: space-around;
+    flex: 1;
+    overflow: scroll;
+}
+
+.hand-wrapper {
+    display: flex;
+    flex: 0 0 auto;
+}
+
+.hand-wrapper-horizontal {
+    flex-direction: row;
+}
+
+.hand-wrapper-vertical {
+    flex-direction: column;
+}
+
+.hand-container-vertical {
+    flex-direction: column;
+    top: 2.5%;
+    width: 100%;
+    height: 75%;
+}
+
+.hand-container-horizontal {
+    flex-direction: row;
+    left: 2.5%;
+    width: 75%;
+    height: 100%;
+}
+
+.hand-domino-container {
+    display: flex;
+}
+
+.current {
+    border: 5px solid tomato;
+}

@@ -1,0 +1,14 @@
+.username-dialog {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    align-items: center;
+    position: fixed;
+    top: 8%;
+    right: 5%;
+    background-color: gainsboro;
+    border: 1px solid black;
+    border-radius: 5px;
+    width: 20%;
+    height: 15%;
+}

@@ -1,0 +1,12 @@
+.game-logs-container {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    width: 200px;
+    height: 150px;
+    overflow: auto;
+    bottom: 0%;
+    margin: 15px;
+    border: 1px solid grey;
+    padding: 5px;
+}
