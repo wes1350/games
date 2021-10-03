@@ -1,12 +1,14 @@
+import { GameConfigMessage } from "@common/interfaces/GameConfigDescriptionMessage";
 import { MessageType } from "@common/interfaces/MessageType";
 import { Socket } from "socket.io";
-import { Engine } from "./Engine";
-import { QueryType } from "./enums/QueryType";
-import { GameConfigDescriptionMessage } from "./interfaces/GameConfigDescriptionMessage";
-import { GameState } from "./interfaces/GameState";
-import { shuffleArray, sleep } from "./utils";
+// import { Engine } from "./Engine";
+// import { QueryType } from "./enums/QueryType";
+// import { GameState } from "./interfaces/GameState";
+import { shuffleArray, sleep } from "@common/utils";
+import { GameManager } from "./GameManager";
 
 export class Room {
+    // Eventually, all of this state should be moved into Redis
     private io: any;
     private id: string;
     private socketIdsToResponses: Map<string, string>;
@@ -60,55 +62,60 @@ export class Room {
         this.socketIdsToNames.delete(socketId);
     }
 
-    public StartGame(config: GameConfigDescriptionMessage): void {
+    public StartGame(config: GameConfigMessage): void {
         console.log("config:", config);
         const randomlyOrderedSocketIds = shuffleArray(this.socketIds);
         randomlyOrderedSocketIds.forEach((socketId: string, i: number) => {
             this.playersToSocketIds.set(i, socketId);
             this.socketIdsToResponses.set(socketId, null);
 
+            // should register socket.once(event, ... ) instead of doing this while-loop check for responses
             this.getSocketFromId(socketId).onAny(
                 (eventName: string, response: string) => {
                     console.log(
-                        "received:",
-                        eventName,
-                        " -- response:",
-                        response
+                        `received: ${eventName} -- response: ${response}`
                     );
                     this.socketIdsToResponses.set(socketId, response);
                 }
             );
         });
 
-        const engine = new Engine(
-            this.socketIds.length,
+        GameManager.RunGame(
             config,
-            this.emitToClient.bind(this),
             this.broadcast.bind(this),
-            this.queryClient.bind(this)
-        );
+            this.emitToPlayer.bind(this),
+            this.queryPlayer.bind(this)
+        ).then(() => this.clear());
 
-        engine.InitializeRound(true);
+        // const engine = new Engine(
+        //     this.socketIds.length,
+        //     config,
+        //     this.emitToPlayer.bind(this),
+        //     this.broadcast.bind(this),
+        //     this.queryPlayer.bind(this)
+        // );
 
-        this.players.forEach((player: number) => {
-            const gameDetails = {
-                players: this.getPlayerRepresentationsForSeat(player),
-                config: {
-                    n_dominoes: config.HandSize
-                }
-            };
-            const socket = this.getSocketFromId(
-                this.playersToSocketIds.get(player)
-            );
-            socket.emit(MessageType.GAME_START, gameDetails);
-            socket.emit(MessageType.HAND, engine.Players[player].HandRep);
-        });
+        // engine.InitializeRound(true);
 
-        engine.RunGame().then((winner) => {
-            console.log("Winner:", winner);
-            this.broadcast(MessageType.GAME_OVER, this.getNameBySeat(winner));
-            this.clear();
-        });
+        // this.players.forEach((player: number) => {
+        //     const gameDetails = {
+        //         players: this.getPlayerRepresentationsForSeat(player),
+        //         config: {
+        //             n_dominoes: config.HandSize
+        //         }
+        //     };
+        //     const socket = this.getSocketFromId(
+        //         this.playersToSocketIds.get(player)
+        //     );
+        //     socket.emit(MessageType.GAME_START, gameDetails);
+        //     socket.emit(MessageType.HAND, engine.Players[player].HandRep);
+        // });
+
+        // engine.RunGame().then((winner) => {
+        //     console.log("Winner:", winner);
+        //     this.broadcast(MessageType.GAME_OVER, this.getNameBySeat(winner));
+        //     this.clear();
+        // });
     }
 
     private clear = () => {
@@ -119,34 +126,16 @@ export class Room {
         this.playersToSocketIds = new Map();
     };
 
-    private getNameBySeat = (seat: number) => {
-        return this.socketIdsToNames.get(this.playersToSocketIds.get(seat));
-    };
-
-    private getPlayerRepresentationsForSeat(
-        seatNumber: number
-    ): { seatNumber: number; name: string; isMe: boolean }[] {
-        return this.players.map((_p, i) => ({
-            seatNumber: i,
-            name: this.getNameBySeat(i),
-            isMe: i === seatNumber
-        }));
-    }
-
-    private broadcast(messageType: MessageType, payload: any) {
+    private broadcast(type: MessageType, payload: any) {
         console.log(
             `broadcasting ${
                 typeof payload === "object" ? JSON.stringify(payload) : payload
-            } of type ${messageType} to room ${this.id}`
+            } of type ${type} to room ${this.id}`
         );
-        this.io.to(this.id).emit(messageType, payload);
+        this.io.to(this.id).emit(type, payload);
     }
 
-    private emitToClient = (
-        type: MessageType,
-        payload: any,
-        player: number
-    ) => {
+    private emitToPlayer = (type: any, payload: any, player: number) => {
         console.log(
             `emitting ${
                 typeof payload === "object" ? JSON.stringify(payload) : payload
@@ -158,12 +147,12 @@ export class Room {
         );
     };
 
-    private queryClient = async (
-        type: QueryType,
-        message: string,
-        player: number,
-        options: any,
-        gameState: GameState
+    private queryPlayer = async (
+        type: any,
+        payload: any,
+        player: number
+        // options: any,
+        // gameState: GameState
     ): Promise<any> => {
         const socketId = this.playersToSocketIds.get(player);
         // if (!this.socketIdsToResponses.has(socketId)) {
@@ -173,7 +162,7 @@ export class Room {
         this.socketIdsToResponses.delete(socketId);
         this.getSocketFromId(this.playersToSocketIds.get(player)).emit(
             type as string,
-            message
+            payload
         );
 
         while (!this.socketIdsToResponses.get(socketId)) {
@@ -184,6 +173,8 @@ export class Room {
             // User disconnected, so their socket ID response key was removed
             return null;
         }
+
+        // try to use socket.once() here instead of this
 
         console.log("response:", this.socketIdsToResponses.get(socketId));
         return this.socketIdsToResponses.get(socketId);

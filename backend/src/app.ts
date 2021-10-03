@@ -2,7 +2,7 @@ import express from "express";
 import * as http from "http";
 import cors from "cors";
 import { Socket } from "socket.io";
-import { GameConfigDescriptionMessage } from "@common/interfaces/GameConfigDescriptionMessage";
+import { GameConfigMessage } from "@common/interfaces/GameConfigDescriptionMessage";
 import { Room } from "./Room";
 import { getRandomInt } from "./utils";
 import redis from "redis";
@@ -129,7 +129,7 @@ io.on("connection", (socket: Socket) => {
 
     socket.on(
         MessageType.GAME_START,
-        (roomId: string, config: GameConfigDescriptionMessage) => {
+        (roomId: string, config: GameConfigMessage) => {
             console.log(`starting game for room ${roomId}`);
             roomIdsToRooms.get(roomId).StartGame(config);
         }
