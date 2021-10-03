@@ -1,0 +1,1 @@
+exports.testFunction = function () {};

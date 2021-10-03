@@ -1,5 +1,5 @@
 {
-    "name": "games-backend",
+    "name": "@wes1350/games-backend",
     "version": "1.0.0",
     "description": "backend for games project",
     "main": "src/index.ts",

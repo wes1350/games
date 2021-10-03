@@ -4,7 +4,6 @@ import { Domino } from "./Domino";
 import { Pack } from "./Pack";
 import { Player } from "./Player";
 import * as _ from "lodash";
-import { GameConfigDescriptionMessage } from "./interfaces/GameConfigDescriptionMessage";
 import { MessageType } from "./enums/MessageType";
 import { QueryType } from "./enums/QueryType";
 import { Direction } from "./enums/Direction";
@@ -34,7 +33,6 @@ export class Engine {
     private _local?: boolean;
 
     public constructor(
-        n_players: number,
         configDescription: GameConfigDescriptionMessage,
         whisper_f: (
             type: MessageType,

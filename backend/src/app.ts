@@ -2,13 +2,15 @@ import express from "express";
 import * as http from "http";
 import cors from "cors";
 import { Socket } from "socket.io";
-import { GameConfigMessage } from "@common/interfaces/GameConfigDescriptionMessage";
+// import { GameConfigMessage } from "@common/interfaces/GameConfigDescriptionMessage";
 import { Room } from "./Room";
-import { getRandomInt } from "./utils";
+// import { getRandomInt } from "./utils";
 import redis from "redis";
 import session, { SessionOptions } from "express-session";
 import connectRedis from "connect-redis";
-import { MessageType } from "@common/interfaces/MessageType";
+// import { MessageType } from "@common/interfaces/MessageType";
+import { MessageType } from "@wes1350/games-common/enums/MessageType";
+import { getRandomInt } from "@wes1350/games-common/utils";
 
 declare module "express-session" {
     interface SessionData {
