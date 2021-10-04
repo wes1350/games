@@ -67,10 +67,7 @@ export class Player {
         return this._hand.length === 0;
     }
 
-    public get HandRep(): { Face1: number; Face2: number }[] {
-        return this.Hand.map((domino) => ({
-            Face1: domino.Big,
-            Face2: domino.Small
-        }));
+    public get HandRep(): number[][] {
+        return this.Hand.map((domino) => [domino.Big, domino.Small]);
     }
 }

@@ -3,175 +3,150 @@ import { Domino } from "./Domino";
 import { Direction } from "./enums/Direction";
 
 export class Board {
-    private _board: Map<number, Map<number, Domino>>;
-    private _north: number;
-    private _east: number;
-    private _south: number;
-    private _west: number;
-    private _spinner_x: number;
+    private spinner: Domino | null;
+    private northArm: Domino[]; // The arms will be empty before there is a spinner and filled in after
+    private eastArm: Domino[];
+    private southArm: Domino[];
+    private westArm: Domino[];
+    private initialRow: Domino[] | null; // This will be filled in before there is a spinner and null after
 
     constructor() {
-        this._board = new Map<number, Map<number, Domino>>();
-        this._north = null;
-        this._east = null;
-        this._south = null;
-        this._west = null;
-        this._spinner_x = null;
+        this.spinner = null;
+        this.northArm = [];
+        this.eastArm = [];
+        this.southArm = [];
+        this.westArm = [];
+        this.initialRow = [];
     }
 
-    private _addToBoard(domino: Domino, x: number, y: number): void {
-        if (!this._board.has(x)) {
-            this._board.set(x, new Map<number, Domino>());
+    public get NDominoes(): number {
+        return this.spinner
+            ? 1
+            : 0 +
+                  this.northArm.length +
+                  this.eastArm.length +
+                  this.westArm.length +
+                  this.southArm.length +
+                  this.initialRow?.length ?? 0;
+    }
+
+    public get Spinner(): Domino | null {
+        return this.spinner;
+    }
+
+    private setSpinner(domino: Domino, addedDirection: Direction) {
+        this.spinner = domino;
+
+        // Assign the already-played dominoes to arms, and clear the initial row
+        if (addedDirection === Direction.EAST) {
+            this.westArm = this.initialRow;
+            // In the initial row, the Head of each domino is on the left. As the spinner is on
+            // the east now, the Heads should point towards the spinner, so we need to reverse them.
+            // Also reverse their order, so that the last one is furthest from the center.
+            this.westArm.forEach((domino) => domino.Reverse());
+            this.westArm = _.reverse(this.westArm);
+        } else if (addedDirection === Direction.WEST) {
+            this.eastArm = this.initialRow;
         }
-        this._board.get(x).set(y, domino);
+
+        this.initialRow = null;
     }
 
-    private _dominoExistsAt(x: number, y: number): boolean {
-        return this._board.get(x)?.has(y);
+    private getArmByDirection(direction: Direction) {
+        if (direction === Direction.NONE) {
+            return null;
+        } else if (direction === Direction.NORTH) {
+            return this.northArm;
+        } else if (direction === Direction.EAST) {
+            return this.eastArm;
+        } else if (direction === Direction.SOUTH) {
+            return this.southArm;
+        } else if (direction === Direction.WEST) {
+            return this.westArm;
+        }
     }
 
-    private _getDominoAt(x: number, y: number): Domino {
-        return this._board.get(x)?.get(y);
-    }
-
-    public AddDomino(
-        domino: Domino,
-        direction = Direction.NONE
-    ): { x: number; y: number } {
-        let [valid, reverse] = this.VerifyPlacement(domino, direction);
-        let x, y;
-        if (!valid) {
+    public AddDomino(domino: Domino, direction: Direction): void {
+        if (!this.VerifyPlacement(domino, direction)) {
             throw new Error(
                 `Domino ${domino.Rep} cannot be added in the ${direction} direction`
             );
         }
 
-        if (direction === Direction.NONE) {
-            // When placing the first domino
-            if (this._dominoExistsAt(0, 0)) {
-                throw new Error(
-                    "Must specify a valid direction if the board contains dominoes"
-                );
-            }
-            x = 0;
-            y = 0;
-            this._north = 0;
-            this._east = 0;
-            this._south = 0;
-            this._west = 0;
+        if (direction === Direction.NONE && this.NDominoes !== 0) {
+            throw new Error(
+                "Tried to add a domino without a direction when it was not the first domino"
+            );
+        }
 
-            if (domino.IsDouble()) {
-                this._spinner_x = 0;
-                domino.MarkAsSpinner();
-            }
-        } else if (direction === Direction.NORTH) {
-            if (this._spinner_x === null) {
-                throw new Error(
-                    "Cannot add domino to north side when spinner isn't set"
-                );
-            }
-            this._north += 1;
-            x = this._spinner_x;
-            y = this._north;
-        } else if (direction === Direction.EAST) {
-            this._east += 1;
-            x = this._east;
-            y = 0;
-            if (this._spinner_x === null && domino.IsDouble()) {
-                this._spinner_x = this._east;
-                domino.MarkAsSpinner();
-            }
-        } else if (direction === Direction.SOUTH) {
-            if (this._spinner_x === null) {
-                throw new Error(
-                    "Cannot add domino to south side when spinner isn't set"
-                );
-            }
-            this._south -= 1;
-            x = this._spinner_x;
-            y = this._south;
-        } else if (direction === Direction.WEST) {
-            this._west -= 1;
-            x = this._west;
-            y = 0;
-            if (this._spinner_x === null && domino.IsDouble()) {
-                this._spinner_x = this._west;
-                domino.MarkAsSpinner();
-            }
+        if (domino.IsDouble && !this.spinner) {
+            this.setSpinner(domino, direction);
         } else {
-            throw new Error("Unknown direction:" + direction);
+            if (!this.spinner) {
+                if (direction === Direction.NONE) {
+                    this.initialRow.push(domino);
+                } else if (direction === Direction.EAST) {
+                    const end = _.last(this.initialRow);
+                    this.initialRow.push(domino);
+                    if (end.Tail !== domino.Head) {
+                        domino.Reverse();
+                    }
+                } else if (direction === Direction.WEST) {
+                    const end = _.first(this.initialRow);
+                    this.initialRow.unshift(domino);
+                    if (end.Head !== domino.Tail) {
+                        domino.Reverse();
+                    }
+                } else {
+                    throw new Error(
+                        `Invalid direction encountered when no spinner was set: ${direction}`
+                    );
+                }
+            } else {
+                const arm = this.getArmByDirection(direction);
+                const end = _.last(arm) ?? this.spinner;
+                arm.push(domino);
+                if (end.Tail !== domino.Head) {
+                    domino.Reverse();
+                }
+            }
         }
-
-        this._addToBoard(domino, x, y);
-        if (reverse) {
-            domino.Reverse();
-        }
-        return { x, y };
     }
 
-    public VerifyPlacement(domino: Domino, direction: Direction): boolean[] {
+    public VerifyPlacement(domino: Domino, direction: Direction): boolean {
         // Return whether a domino can be placed in the given direction
-        // and whether it needs to be reversed in order to be valid.
-        let x, y;
         if (direction === Direction.NONE) {
-            if (this._dominoExistsAt(0, 0)) {
-                return [false, false];
-            }
-            return [true, false]; // No need to check in this case as it's the first placement
-        } else if (direction === Direction.NORTH) {
-            if (
-                this._spinner_x === null ||
-                this._east === this._spinner_x ||
-                this._west === this._spinner_x
-            ) {
-                return [false, false];
-            }
-            x = this._spinner_x;
-            y = this._north;
-        } else if (direction === Direction.EAST) {
-            x = this._east;
-            y = 0;
-        } else if (direction === Direction.SOUTH) {
-            if (
-                this._spinner_x === null ||
-                this._east === this._spinner_x ||
-                this._west === this._spinner_x
-            ) {
-                return [false, false];
-            }
-            x = this._spinner_x;
-            y = this._south;
-        } else if (direction === Direction.WEST) {
-            x = this._west;
-            y = 0;
+            return this.NDominoes === 0;
         } else {
-            throw new Error("Invalid direction:" + direction);
-        }
+            if (this.NDominoes === 0) {
+                return false;
+            }
 
-        let hook;
-        if ([Direction.NORTH, Direction.WEST].includes(direction)) {
-            hook = this._getDominoAt(x, y).Head;
-        } else {
-            hook = this._getDominoAt(x, y).Tail;
+            if (this.spinner) {
+                if (
+                    direction === Direction.NORTH ||
+                    direction === Direction.SOUTH
+                ) {
+                    if (
+                        this.eastArm.length === 0 ||
+                        this.westArm.length === 0
+                    ) {
+                        return false;
+                    }
+                }
+                const arm = this.getArmByDirection(direction);
+                const end = _.last(arm) ?? this.spinner;
+                return domino.HasFace(end.Tail);
+            } else {
+                if (direction === Direction.EAST) {
+                    return domino.HasFace(_.first(this.initialRow).Head);
+                } else if (direction === Direction.WEST) {
+                    return domino.HasFace(_.last(this.initialRow).Tail);
+                } else {
+                    return false;
+                }
+            }
         }
-        if (this.GetLinkEnd(domino, direction) === hook) {
-            return [true, false];
-        } else if (this.GetFreeEnd(domino, direction) === hook) {
-            return [true, true];
-        }
-        return [false, false];
-    }
-
-    public GetLinkEnd(domino: Domino, direction: Direction) {
-        return [Direction.NORTH, Direction.WEST].includes(direction)
-            ? domino.Tail
-            : domino.Head;
-    }
-
-    public GetFreeEnd(domino: Domino, direction: Direction) {
-        return [Direction.NORTH, Direction.WEST].includes(direction)
-            ? domino.Head
-            : domino.Tail;
     }
 
     public GetValidPlacements(domino: Domino): Direction[] {
@@ -179,31 +154,31 @@ export class Board {
         if (this.IsEmpty()) {
             return [Direction.NONE];
         }
-        return Object.values(Direction).filter(
-            (d) => this.VerifyPlacement(domino, d)[0]
+        return Object.values(Direction).filter((d) =>
+            this.VerifyPlacement(domino, d)
         );
     }
 
     public GetValidPlacementsForHand(
         hand: Domino[],
-        play_fresh = false
+        playFresh = false
     ): { index: number; domino: Domino; dirs: Direction[] }[] {
         const placements: {
             index: number;
             domino: Domino;
             dirs: Direction[];
         }[] = [];
-        let largest_double = -1;
-        if (play_fresh) {
+        let largestDouble = -1;
+        if (playFresh) {
             hand.forEach((domino: Domino) => {
-                if (domino.IsDouble() && domino.Head > largest_double) {
-                    largest_double = domino.Head;
+                if (domino.IsDouble && domino.Big > largestDouble) {
+                    largestDouble = domino.Big;
                 }
             });
         }
         hand.forEach((domino, i) => {
-            if (play_fresh) {
-                if (domino.Head !== largest_double || !domino.IsDouble()) {
+            if (playFresh) {
+                if (domino.Head !== largestDouble || !domino.IsDouble) {
                     placements.push({ index: i, domino, dirs: [] });
                 } else {
                     placements.push({
@@ -223,7 +198,7 @@ export class Board {
         return placements;
     }
     public IsEmpty(): boolean {
-        return Array.from(this._board.keys()).length === 0;
+        return this.NDominoes === 0;
     }
 
     public get Score(): number {
@@ -232,122 +207,122 @@ export class Board {
         }
 
         let total = 0;
-        if (this._east === 0 && this._west === 0) {
-            total += this._getDominoAt(0, 0).Total;
+        if (this.spinner) {
+            if (this.eastArm.length === 0 && this.westArm.length === 0) {
+                total += this.spinner.Total;
+            } else if (this.eastArm.length === 0) {
+                total += _.last(this.westArm).ExposedTotal + this.spinner.Total;
+            } else if (this.westArm.length === 0) {
+                total += _.last(this.eastArm).ExposedTotal + this.spinner.Total;
+            } else {
+                total += _.last(this.westArm).ExposedTotal;
+                total += _.last(this.eastArm).ExposedTotal;
+                total += _.last(this.northArm)?.ExposedTotal ?? 0;
+                total += _.last(this.southArm)?.ExposedTotal ?? 0;
+            }
         } else {
-            // We have at least two dominoes, so each domino on the end will only count once
-
-            // Handle east-west
-            let east = this._getDominoAt(this._east, 0);
-            let west = this._getDominoAt(this._west, 0);
-
-            if (east.IsDouble()) {
-                total += east.Total;
-            } else {
-                total += this.GetFreeEnd(east, Direction.EAST);
-            }
-
-            if (west.IsDouble()) {
-                total += west.Total;
-            } else {
-                total += this.GetFreeEnd(west, Direction.WEST);
-            }
-
-            // Handle north-south
-            if (this._north > 0) {
-                let north = this._getDominoAt(this._spinner_x, this._north);
-                if (north.IsDouble()) {
-                    total += north.Total;
-                } else {
-                    total += this.GetFreeEnd(north, Direction.NORTH);
-                }
-            }
-
-            if (this._south < 0) {
-                let south = this._getDominoAt(this._spinner_x, this._south);
-                if (south.IsDouble()) {
-                    total += south.Total;
-                } else {
-                    total += this.GetFreeEnd(south, Direction.SOUTH);
-                }
-            }
+            total +=
+                _.first(this.initialRow).Head + _.last(this.initialRow).Tail;
         }
+
         return total % 5 === 0 ? total : 0;
-    }
-
-    public get NorthEdge(): { x: number; y: number } {
-        return this._spinner_x !== null
-            ? { x: this._spinner_x, y: this._north }
-            : null;
-    }
-
-    public get EastEdge(): { x: number; y: number } {
-        return { x: this._east, y: 0 };
-    }
-
-    public get SouthEdge(): { x: number; y: number } {
-        return this._spinner_x !== null
-            ? { x: this._spinner_x, y: this._south }
-            : null;
-    }
-
-    public get WestEdge(): { x: number; y: number } {
-        return { x: this._west, y: 0 };
     }
 
     public get Rep(): string {
         // Prints the current board state.
-        if (this._north === null) {
-            return ".";
-        }
-        let rep = "";
-        for (let r = this._north; r > this._south - 1; r--) {
-            for (let c = this._west; c < this._east + 1; c++) {
-                if (this._dominoExistsAt(c, r)) {
-                    rep += this._getDominoAt(c, r).Rep;
-                } else {
-                    rep += "  .  ";
-                }
-            }
-            rep += "\n";
-        }
-        return rep;
-    }
 
-    public get Dominoes(): Domino[] {
-        return _.flatten(
-            Array.from(this._board.values()).map((yMap) =>
-                Array.from(yMap.values())
-            )
-        );
-    }
-
-    public get DominoRepresentations(): {
-        head: number;
-        tail: number;
-        x: number;
-        y: number;
-    }[] {
-        return _.flatten(
-            Array.from(this._board.entries()).map((xEntry) => {
-                const x = xEntry[0];
-                const xMap = xEntry[1];
-                return Array.from(xMap.entries()).map((yEntry) => {
-                    const y = yEntry[0];
-                    const domino = yEntry[1];
-                    return { head: domino.Head, tail: domino.Tail, x, y };
-                });
+        console.log(
+            JSON.stringify({
+                spinner: this.spinner?.Rep,
+                northArm: this.northArm.map((domino) => domino.Rep),
+                eastArm: this.eastArm.map((domino) => domino.Rep),
+                southArm: this.southArm.map((domino) => domino.Rep),
+                westArm: this.westArm.map((domino) => domino.Rep),
+                initialRow: this.initialRow?.map((domino) => domino.Rep)
             })
         );
+
+        let rep = "";
+        const blank = "     ";
+
+        if (this.spinner) {
+            // top
+            for (let i = this.northArm.length - 1; i >= 0; i--) {
+                for (let i = 0; i < this.westArm.length; i++) {
+                    rep += blank;
+                }
+
+                rep += this.northArm[i].Rep + "\n";
+            }
+
+            // middle row
+            for (let i = this.westArm.length - 1; i >= 0; i--) {
+                rep += this.westArm[i].ReversedRep;
+            }
+
+            rep += this.spinner.Rep;
+
+            for (let i = 0; i < this.eastArm.length; i++) {
+                rep += this.eastArm[i].Rep;
+            }
+
+            rep += "\n";
+
+            // bottom
+            for (let i = 0; i < this.southArm.length; i++) {
+                for (let i = 0; i < this.westArm.length; i++) {
+                    rep += blank;
+                }
+
+                rep += this.southArm[i].Rep + "\n";
+            }
+
+            return rep;
+        } else {
+            return this.initialRow.map((domino) => domino.Rep).join("");
+        }
+
+        // if (this._north === null) {
+        //     return ".";
+        // }
+        // let rep = "";
+        // for (let r = this._north; r > this._south - 1; r--) {
+        //     for (let c = this._west; c < this._east + 1; c++) {
+        //         if (this._dominoExistsAt(c, r)) {
+        //             rep += this._getDominoAt(c, r).Rep;
+        //         } else {
+        //             rep += "  .  ";
+        //         }
+        //     }
+        //     rep += "\n";
+        // }
+        // return rep;
     }
 
-    // The face value of the spinner, or null if the spinner doesn't exist
-    public get Spinner(): number {
-        if (this._spinner_x === null) {
-            return null;
-        }
-        return Array.from(this._board.get(this._spinner_x).values()).find(
-            (domino) => domino.IsSpinner()
-        ).Big;
-    }
+    // public get Dominoes(): Domino[] {
+    //     return _.flatten(
+    //         Array.from(this._board.values()).map((yMap) =>
+    //             Array.from(yMap.values())
+    //         )
+    //     );
+    // }
+
+    // public get DominoRepresentations(): {
+    //     head: number;
+    //     tail: number;
+    //     x: number;
+    //     y: number;
+    // }[] {
+    //     return _.flatten(
+    //         Array.from(this._board.entries()).map((xEntry) => {
+    //             const x = xEntry[0];
+    //             const xMap = xEntry[1];
+    //             return Array.from(xMap.entries()).map((yEntry) => {
+    //                 const y = yEntry[0];
+    //                 const domino = yEntry[1];
+    //                 return { head: domino.Head, tail: domino.Tail, x, y };
+    //             });
+    //         })
+    //     );
+    // }
 }

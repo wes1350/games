@@ -26,12 +26,6 @@ let players: Agent[] = _.flatten([
     agents
 ]);
 
-const shuffle = false;
-
-if (shuffle) {
-    players = _.shuffle(players);
-}
-
 const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
@@ -96,19 +90,8 @@ const queryPlayer = async (
 };
 
 const emitToPlayer = (type: any, payload: any, playerId: string) => {
-    let processedPayload;
-
-    if (type === GameMessageType.HAND) {
-        processedPayload = JSON.stringify(
-            payload.map((domino: { Face1: number; Face2: number }) => [
-                domino.Face1,
-                domino.Face2
-            ])
-        );
-    } else {
-        processedPayload =
-            typeof payload === "object" ? JSON.stringify(payload) : payload;
-    }
+    const processedPayload =
+        typeof payload === "object" ? JSON.stringify(payload) : payload;
 
     console.log(
         `whispering ${type} to player ${playerId} with payload: ${processedPayload}`
@@ -131,7 +114,7 @@ const broadcast = (type: any, payload?: any) => {
 const engine = new DominoesEngine(
     {
         gameType: GameType.DOMINOES,
-        nPlayers: 2
+        nPlayers: players.length
     },
     players.map((player, i) => ({
         id: i.toString(),

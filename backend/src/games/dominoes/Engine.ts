@@ -88,17 +88,15 @@ export class Engine {
 
     public async RunGame(): Promise<string> {
         // Start and run a game until completion, handling game logic as necessary.
-        this.InitializeRound(true);
         this._players.forEach((player: Player) => {
             this._emitToPlayer(
                 GameMessageType.GAME_START,
                 this.getInitialPlayerRepresentationsForPlayer(player.Id),
                 player.Id
             );
-            this._emitToPlayer(GameMessageType.HAND, player.HandRep, player.Id);
         });
+        this.InitializeRound(true);
 
-        // this._shout(GameGameMessageType.HAND, gameDetails);
         let next_round_fresh = await this.PlayRound(true);
         while (!this.GameIsOver()) {
             this.InitializeRound(next_round_fresh);
@@ -147,20 +145,23 @@ export class Engine {
             );
             this.CurrentPlayer.AddPoints(scoreOnDomino);
             this._broadcast(GameMessageType.SCORE, {
-                seat: this.CurrentPlayer,
+                seat: this.CurrentPlayer.Index,
                 score: scoreOnDomino
             });
             this._broadcast(GameMessageType.PLAYER_DOMINOED);
             return false;
         } else if (blocked) {
             this._broadcast(GameMessageType.GAME_BLOCKED);
-            let [blocked_scorer, points] = this.GetBlockedResult();
-            if (blocked_scorer !== null) {
+            const blockedResult = this.GetBlockedResult();
+            const player = blockedResult.player;
+            const total = blockedResult.total;
+
+            if (player !== null) {
                 this._broadcast(GameMessageType.SCORE, {
-                    seat: blocked_scorer,
-                    score: points
+                    seat: player.Index,
+                    score: total
                 });
-                this.getPlayerByIndex(blocked_scorer).AddPoints(points);
+                player.AddPoints(total);
             }
             return true;
         } else {
@@ -178,20 +179,23 @@ export class Engine {
         const domino = move.domino;
         const direction = move.direction;
         if (domino !== null) {
-            const addedCoordinate = this._board.AddDomino(domino, direction);
-            const placementRep = this.GetPlacementRep(domino, direction);
+            this._board.AddDomino(domino, direction);
+            // const addedCoordinate = this._board.AddDomino(domino, direction);
+            // const placementRep = this.GetPlacementRep(domino, direction);
             this.CurrentPlayer.RemoveDomino(domino);
             this._broadcast(GameMessageType.TURN, {
-                seat: this.CurrentPlayer,
+                seat: this.CurrentPlayer.Index,
                 domino: {
                     Face1: domino.Big,
                     Face2: domino.Small
                 },
-                direction: placementRep.direction,
-                coordinate: {
-                    X: addedCoordinate.x,
-                    Y: addedCoordinate.y
-                }
+                direction: null,
+                // direction: placementRep.direction,
+                coordinate: null
+                // coordinate: {
+                //     X: addedCoordinate.x,
+                //     Y: addedCoordinate.y
+                // }
             });
 
             this._emitToPlayer(
@@ -201,12 +205,12 @@ export class Engine {
             );
 
             this._broadcast(GameMessageType.DOMINO_PLAYED, {
-                seat: this.CurrentPlayer
+                seat: this.CurrentPlayer.Index
             });
 
             if (this._board.Score) {
                 this._broadcast(GameMessageType.SCORE, {
-                    seat: this.CurrentPlayer,
+                    seat: this.CurrentPlayer.Index,
                     score: this._board.Score
                 });
             }
@@ -218,7 +222,7 @@ export class Engine {
             this._nPasses += 1;
 
             this._broadcast(GameMessageType.TURN, {
-                seat: this.CurrentPlayer,
+                seat: this.CurrentPlayer.Index,
                 domino: null,
                 direction: null,
                 coordinate: null
@@ -278,7 +282,7 @@ export class Engine {
         // Check that no hand has 5 doubles
         let no_doubles = true;
         hands.forEach((hand) => {
-            const n_doubles = hand.filter((d) => d.IsDouble()).length;
+            const n_doubles = hand.filter((d) => d.IsDouble).length;
             if (check_5_doubles) {
                 if (n_doubles >= 5) {
                     return false;
@@ -434,7 +438,7 @@ export class Engine {
 
                 if (pulled !== null) {
                     this._broadcast(GameMessageType.PULL, {
-                        seat: this.CurrentPlayer
+                        seat: this.CurrentPlayer.Index
                     });
                     player.AddDomino(pulled[0]);
                     this._emitToPlayer(
@@ -465,17 +469,17 @@ export class Engine {
         return total;
     }
 
-    public GetBlockedResult() {
+    public GetBlockedResult(): { player: Player; total: number } {
         // Find the player (if any) that wins points when the game is blocked and return
         // that player and the points they receive.
         const totals = this._players.map((p) => p.HandTotal);
         if (totals.filter((t) => t === Math.min(...totals)).length > 1) {
             // Multiple players have lowest count, so nobody gets points
-            return [null, 0];
+            return { player: null, total: 0 };
         } else {
             // Find the player with minimum score and the sum of the other players' hands, rounded to the nearest 5
             const scorer = this._players.find(
-                (player) => player.Score === Math.min(...totals)
+                (player) => player.HandTotal === Math.min(...totals)
             );
             let total = totals.reduce((a, b) => a + b, 0) - Math.min(...totals);
             if (total % 5 > 2) {
@@ -483,59 +487,59 @@ export class Engine {
             } else {
                 total -= total % 5;
             }
-            return [scorer.Index, total];
+            return { player: scorer, total: total };
         }
     }
 
-    public GetPlacementRep(domino: Domino, addedDirection: Direction) {
-        // After adding a domino to the board, return how it will look in its rendered form
-        let dominoOrientationDirection: Direction;
-        if (
-            addedDirection === Direction.NONE ||
-            addedDirection === Direction.EAST ||
-            addedDirection === Direction.WEST
-        ) {
-            if (domino.IsDouble()) {
-                dominoOrientationDirection = Direction.SOUTH;
-            } else {
-                dominoOrientationDirection = domino.IsReversed()
-                    ? Direction.WEST
-                    : Direction.EAST;
-            }
-        } else if (
-            addedDirection === Direction.NORTH ||
-            addedDirection === Direction.SOUTH
-        ) {
-            if (domino.IsDouble()) {
-                dominoOrientationDirection = Direction.EAST;
-            } else {
-                dominoOrientationDirection = domino.IsReversed()
-                    ? Direction.NORTH
-                    : Direction.SOUTH;
-            }
-        }
+    // public GetPlacementRep(domino: Domino, addedDirection: Direction) {
+    //     // After adding a domino to the board, return how it will look in its rendered form
+    //     let dominoOrientationDirection: Direction;
+    //     if (
+    //         addedDirection === Direction.NONE ||
+    //         addedDirection === Direction.EAST ||
+    //         addedDirection === Direction.WEST
+    //     ) {
+    //         if (domino.IsDouble) {
+    //             dominoOrientationDirection = Direction.SOUTH;
+    //         } else {
+    //             dominoOrientationDirection = domino.IsReversed
+    //                 ? Direction.WEST
+    //                 : Direction.EAST;
+    //         }
+    //     } else if (
+    //         addedDirection === Direction.NORTH ||
+    //         addedDirection === Direction.SOUTH
+    //     ) {
+    //         if (domino.IsDouble) {
+    //             dominoOrientationDirection = Direction.EAST;
+    //         } else {
+    //             dominoOrientationDirection = domino.IsReversed
+    //                 ? Direction.NORTH
+    //                 : Direction.SOUTH;
+    //         }
+    //     }
 
-        const dominoCoordinates =
-            addedDirection === Direction.NONE
-                ? { x: 0, y: 0 }
-                : addedDirection === Direction.NORTH
-                ? this._board.NorthEdge
-                : addedDirection === Direction.EAST
-                ? this._board.EastEdge
-                : addedDirection === Direction.SOUTH
-                ? this._board.SouthEdge
-                : addedDirection === Direction.WEST
-                ? this._board.WestEdge
-                : null;
+    //     const dominoCoordinates =
+    //         addedDirection === Direction.NONE
+    //             ? { x: 0, y: 0 }
+    //             : addedDirection === Direction.NORTH
+    //             ? this._board.NorthEdge
+    //             : addedDirection === Direction.EAST
+    //             ? this._board.EastEdge
+    //             : addedDirection === Direction.SOUTH
+    //             ? this._board.SouthEdge
+    //             : addedDirection === Direction.WEST
+    //             ? this._board.WestEdge
+    //             : null;
 
-        return {
-            face1: domino.Head,
-            face2: domino.Tail,
-            direction: dominoOrientationDirection,
-            x: dominoCoordinates.x,
-            y: dominoCoordinates.y
-        };
-    }
+    //     return {
+    //         face1: domino.Head,
+    //         face2: domino.Tail,
+    //         direction: dominoOrientationDirection,
+    //         x: dominoCoordinates.x,
+    //         y: dominoCoordinates.y
+    //     };
+    // }
 
     public get Players(): Player[] {
         return this._players;
@@ -579,8 +583,9 @@ export class Engine {
         return {
             config: this._config.ConfigDescription,
             seatNumberForTurn: this._currentPlayerIndex, // maybe need to go back one player for event notification, depending on call order
-            spinner: this._board.Spinner,
-            board: this._board.DominoRepresentations,
+            spinner: this._board.Spinner?.Head,
+            // board: this._board.DominoRepresentations,
+            board: null,
             players: this.getPlayerRepresentations(player)
         };
     }
