@@ -229,18 +229,7 @@ export class Board {
     }
 
     public get Rep(): string {
-        // Prints the current board state.
-
-        console.log(
-            JSON.stringify({
-                spinner: this.spinner?.Rep,
-                northArm: this.northArm.map((domino) => domino.Rep),
-                eastArm: this.eastArm.map((domino) => domino.Rep),
-                southArm: this.southArm.map((domino) => domino.Rep),
-                westArm: this.westArm.map((domino) => domino.Rep),
-                initialRow: this.initialRow?.map((domino) => domino.Rep)
-            })
-        );
+        // Returns a textual representation of the current board state.
 
         let rep = "";
         const blank = "     ";
@@ -274,29 +263,13 @@ export class Board {
                     rep += blank;
                 }
 
-                rep += this.southArm[i].Rep + "\n";
+                rep += this.southArm[i].ReversedRep + "\n";
             }
 
             return rep;
         } else {
             return this.initialRow.map((domino) => domino.Rep).join("");
         }
-
-        // if (this._north === null) {
-        //     return ".";
-        // }
-        // let rep = "";
-        // for (let r = this._north; r > this._south - 1; r--) {
-        //     for (let c = this._west; c < this._east + 1; c++) {
-        //         if (this._dominoExistsAt(c, r)) {
-        //             rep += this._getDominoAt(c, r).Rep;
-        //         } else {
-        //             rep += "  .  ";
-        //         }
-        //     }
-        //     rep += "\n";
-        // }
-        // return rep;
     }
 
     // public get Dominoes(): Domino[] {

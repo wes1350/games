@@ -65,7 +65,7 @@ export class Domino {
             : `[${this.Big},${this.Small}]`;
     }
 
-    // Used for dominoes in the west arm, since the head points towards the center
+    // Used for dominoes in the south and west arms, since the head points towards the center
     public get ReversedRep(): string {
         return !this.reversed
             ? `[${this.Small},${this.Big}]`
