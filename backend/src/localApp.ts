@@ -1,14 +1,14 @@
-import { Engine } from "./Engine";
 import * as readline from "readline";
-import { shuffleArray } from "./utils";
-import { QueryType } from "./enums/QueryType";
-import { MessageType } from "./enums/MessageType";
-import RandomAgent from "./agents/RandomAgent";
 import _ from "lodash";
-import { Agent } from "./agents/Agent";
-import { Direction } from "./enums/Direction";
-import { GameState } from "./interfaces/GameState";
-import GreedyAgent from "./agents/GreedyAgent";
+import { Agent } from "./games/dominoes/agents/Agent";
+import RandomAgent from "./games/dominoes/agents/RandomAgent";
+import GreedyAgent from "./games/dominoes/agents/GreedyAgent";
+// import { QueryType } from "./games/dominoes/enums/QueryType";
+import { Direction } from "./games/dominoes/enums/Direction";
+import { GameState } from "./games/dominoes/interfaces/GameState";
+import { GameMessageType } from "./games/dominoes/enums/GameMessageType";
+import { Engine as DominoesEngine } from "./games/dominoes/Engine";
+import { GameType } from "./common/enums/GameType";
 
 // Run the game locally on the command line
 
@@ -17,9 +17,10 @@ const playerMap = {
     RandomAgent: RandomAgent
 };
 
-const N_Humans = 1;
+const N_Humans = 2;
 // const agents = [RandomAgent];
-const agents = [GreedyAgent];
+// const agents = [GreedyAgent];
+const agents: Agent[] = [];
 let players: Agent[] = _.flatten([
     _.range(N_Humans).map((i) => playerMap["Human"]),
     agents
@@ -28,7 +29,7 @@ let players: Agent[] = _.flatten([
 const shuffle = false;
 
 if (shuffle) {
-    players = shuffleArray(players);
+    players = _.shuffle(players);
 }
 
 const rl = readline.createInterface({
@@ -42,16 +43,17 @@ const input = (message: string): Promise<string> => {
     });
 };
 
-const query = async (
-    type: QueryType,
+const queryPlayer = async (
+    type: any,
     message: string,
-    player: number,
+    playerId: string,
     options: { domino: number; direction: Direction }[],
     gameState: GameState
 ): Promise<any> => {
     // locally, you must respond in the format 'dominoIndex direction', e.g. '3 W'
     // if there is only one possible direction, you can skip specifying the direction
-    if (players[player] === playerMap["Human"]) {
+    const player = players[parseInt(playerId)];
+    if (player === playerMap["Human"]) {
         return input(message + "\n").then((response) => {
             return {
                 domino: parseInt(response.split(" ")[0]),
@@ -75,12 +77,7 @@ const query = async (
         console.log("going to ask agent");
 
         // For now, send a blank game state. We need to add this later
-        const response = await players[player].respond(
-            type,
-            gameState,
-            player,
-            options
-        );
+        const response = await player.respond(type, gameState, player, options);
         console.log("response:", response);
         try {
             return {
@@ -98,10 +95,10 @@ const query = async (
     }
 };
 
-const whisper = (type: MessageType, payload: any, player: number) => {
+const emitToPlayer = (type: any, payload: any, playerId: string) => {
     let processedPayload;
 
-    if (type === MessageType.HAND) {
+    if (type === GameMessageType.HAND) {
         processedPayload = JSON.stringify(
             payload.map((domino: { Face1: number; Face2: number }) => [
                 domino.Face1,
@@ -114,13 +111,13 @@ const whisper = (type: MessageType, payload: any, player: number) => {
     }
 
     console.log(
-        `whispering ${type} to player ${player} with payload: ${processedPayload}`
+        `whispering ${type} to player ${playerId} with payload: ${processedPayload}`
     );
 };
 
-const typesToIgnore = [MessageType.CLEAR_BOARD];
+const typesToIgnore = [GameMessageType.CLEAR_BOARD];
 
-const shout = (type: MessageType, payload?: any) => {
+const broadcast = (type: any, payload?: any) => {
     // Add log shouting in here based on parameters
     if (!typesToIgnore.includes(type)) {
         console.log(
@@ -131,6 +128,19 @@ const shout = (type: MessageType, payload?: any) => {
     }
 };
 
-const engine = new Engine(2, {}, whisper, shout, query, true);
-engine.InitializeRound(true);
-engine.RunGame().then((winner) => console.log(winner));
+const engine = new DominoesEngine(
+    {
+        gameType: GameType.DOMINOES,
+        nPlayers: 2
+    },
+    players.map((player, i) => ({
+        id: i.toString(),
+        name: i.toString()
+    })),
+    emitToPlayer,
+    broadcast,
+    queryPlayer,
+    true
+);
+// engine.InitializeRound(true);
+engine.RunGame().then(() => console.log("game over!"));

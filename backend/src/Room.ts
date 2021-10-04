@@ -1,11 +1,12 @@
-import { GameConfigMessage } from "@common/interfaces/GameConfigDescriptionMessage";
-import { MessageType } from "@common/interfaces/MessageType";
+// import { GameConfigMessage } from "@common/interfaces/GameConfigDescriptionMessage";
+// import { MessageType } from "@common/interfaces/MessageType";
 import { Socket } from "socket.io";
+import { sleep } from "./common/utils";
 // import { Engine } from "./Engine";
 // import { QueryType } from "./enums/QueryType";
 // import { GameState } from "./interfaces/GameState";
-import { shuffleArray, sleep } from "@common/utils";
 import { GameManager } from "./GameManager";
+import { PlayerDetails } from "./interfaces/PlayerDetails";
 
 export class Room {
     // Eventually, all of this state should be moved into Redis
@@ -13,19 +14,19 @@ export class Room {
     private id: string;
     private socketIdsToResponses: Map<string, string>;
     private socketIdsToNames: Map<string, string>;
-    private playersToSocketIds: Map<number, string>;
+    // private playersToSocketIds: Map<number, string>;
 
     constructor(id: string, io: any) {
         this.io = io;
         this.id = id;
         this.socketIdsToResponses = new Map<string, string>();
         this.socketIdsToNames = new Map<string, string>();
-        this.playersToSocketIds = new Map<number, string>();
+        // this.playersToSocketIds = new Map<number, string>();
     }
 
-    private get players(): number[] {
-        return Array.from(this.playersToSocketIds.keys());
-    }
+    // private get players(): number[] {
+    //     return Array.from(this.playersToSocketIds.keys());
+    // }
 
     private get socketIds(): string[] {
         return Array.from(this.socketIdsToResponses.keys());
@@ -35,10 +36,18 @@ export class Room {
         return this.io.sockets.sockets.get(socketId) as Socket;
     }
 
-    public get PlayerDetails(): { name: string }[] {
-        return Array.from(this.socketIdsToNames.values()).map((name) => ({
-            name: name
+    public get PlayerDetails(): PlayerDetails[] {
+        return Array.from(this.socketIdsToNames.entries()).map((entry) => ({
+            id: entry[0],
+            name: entry[1]
         }));
+        // return Array.from(this.socketIdsToNames.values()).map((name) => ({
+        //     name: name
+        // }));
+    }
+
+    public get NPlayers(): number {
+        return this.socketIds.length;
     }
 
     public AddPlayer(socketId: string, playerName: string): void {
@@ -62,11 +71,10 @@ export class Room {
         this.socketIdsToNames.delete(socketId);
     }
 
-    public StartGame(config: GameConfigMessage): void {
+    public StartGame(config: any): void {
         console.log("config:", config);
-        const randomlyOrderedSocketIds = shuffleArray(this.socketIds);
-        randomlyOrderedSocketIds.forEach((socketId: string, i: number) => {
-            this.playersToSocketIds.set(i, socketId);
+        this.socketIds.forEach((socketId: string) => {
+            // this.playersToSocketIds.set(i, socketId);
             this.socketIdsToResponses.set(socketId, null);
 
             // should register socket.once(event, ... ) instead of doing this while-loop check for responses
@@ -82,6 +90,7 @@ export class Room {
 
         GameManager.RunGame(
             config,
+            this.PlayerDetails,
             this.broadcast.bind(this),
             this.emitToPlayer.bind(this),
             this.queryPlayer.bind(this)
@@ -123,10 +132,10 @@ export class Room {
             this.RemovePlayerBySocketId(socketId);
             this.io.sockets.sockets.get(socketId).leave(this.id);
         });
-        this.playersToSocketIds = new Map();
+        // this.playersToSocketIds = new Map();
     };
 
-    private broadcast(type: MessageType, payload: any) {
+    private broadcast(type: any, payload: any) {
         console.log(
             `broadcasting ${
                 typeof payload === "object" ? JSON.stringify(payload) : payload
@@ -135,52 +144,41 @@ export class Room {
         this.io.to(this.id).emit(type, payload);
     }
 
-    private emitToPlayer = (type: any, payload: any, player: number) => {
-        console.log(
-            `emitting ${
-                typeof payload === "object" ? JSON.stringify(payload) : payload
-            } of type ${type} to player ${player}`
-        );
-        this.getSocketFromId(this.playersToSocketIds.get(player)).emit(
-            type as string,
-            payload
-        );
+    private emitToPlayer = (type: any, payload: any, playerId: string) => {
+        // console.log(
+        //     `emitting ${
+        //         typeof payload === "object" ? JSON.stringify(payload) : payload
+        //     } of type ${type} to player ${playerId}`
+        // );
+        this.getSocketFromId(playerId).emit(type as string, payload);
     };
 
     private queryPlayer = async (
         type: any,
         payload: any,
-        player: number
+        playerId: string
         // options: any,
         // gameState: GameState
     ): Promise<any> => {
-        const socketId = this.playersToSocketIds.get(player);
         // if (!this.socketIdsToResponses.has(socketId)) {
         //     // User disconnected, so their socket ID response key was removed
         //     return null;
         // }
-        this.socketIdsToResponses.delete(socketId);
-        this.getSocketFromId(this.playersToSocketIds.get(player)).emit(
-            type as string,
-            payload
-        );
+        this.socketIdsToResponses.delete(playerId);
+        this.getSocketFromId(playerId).emit(type as string, payload);
 
-        while (!this.socketIdsToResponses.get(socketId)) {
+        while (!this.socketIdsToResponses.get(playerId)) {
             await sleep(100);
         }
 
-        if (!this.socketIdsToResponses.has(socketId)) {
+        if (!this.socketIdsToResponses.has(playerId)) {
             // User disconnected, so their socket ID response key was removed
             return null;
         }
 
         // try to use socket.once() here instead of this
 
-        console.log("response:", this.socketIdsToResponses.get(socketId));
-        return this.socketIdsToResponses.get(socketId);
+        console.log("response:", this.socketIdsToResponses.get(playerId));
+        return this.socketIdsToResponses.get(playerId);
     };
-
-    public get NPlayers(): number {
-        return this.socketIds.length;
-    }
 }

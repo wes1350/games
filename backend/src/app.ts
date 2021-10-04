@@ -8,9 +8,12 @@ import { Room } from "./Room";
 import redis from "redis";
 import session, { SessionOptions } from "express-session";
 import connectRedis from "connect-redis";
+import { RoomMessageType } from "./common/enums/RoomMessageType";
+import { getRandomInt } from "./common/utils";
+import { GameMessageType } from "./games/dominoes/enums/GameMessageType";
 // import { MessageType } from "@common/interfaces/MessageType";
-import { MessageType } from "@wes1350/games-common/enums/MessageType";
-import { getRandomInt } from "@wes1350/games-common/utils";
+// import { MessageType } from "@wes1350/games-common/enums/MessageType";
+// import { getRandomInt } from "@wes1350/games-common/utils";
 
 declare module "express-session" {
     interface SessionData {
@@ -121,7 +124,7 @@ io.on("connection", (socket: Socket) => {
                 room.RemovePlayerBySocketId(socket.id);
                 // Replace with a user ID or something here
                 if (room.NPlayers > 0) {
-                    io.to(roomId).emit(MessageType.PLAYER_LEFT_ROOM, null);
+                    io.to(roomId).emit(RoomMessageType.PLAYER_LEFT_ROOM, null);
                 } else {
                     roomIdsToRooms.delete(roomId);
                 }
@@ -130,14 +133,15 @@ io.on("connection", (socket: Socket) => {
     });
 
     socket.on(
-        MessageType.GAME_START,
-        (roomId: string, config: GameConfigMessage) => {
+        GameMessageType.GAME_START,
+        // TODO: add type for config
+        (roomId: string, config: any) => {
             console.log(`starting game for room ${roomId}`);
             roomIdsToRooms.get(roomId).StartGame(config);
         }
     );
 
-    socket.on(MessageType.JOIN_ROOM, (roomId: string) => {
+    socket.on(RoomMessageType.JOIN_ROOM, (roomId: string) => {
         console.log("socket session ID:", (socket.request as any).session.id);
         redisStoreInstance.get(
             (socket.request as any).session.id,
@@ -160,16 +164,18 @@ io.on("connection", (socket: Socket) => {
                 const room = roomIdsToRooms.get(roomId);
                 room.AddPlayer(socket.id, session.playerName);
                 io.to(roomId).emit(
-                    MessageType.ROOM_DETAILS,
+                    RoomMessageType.ROOM_DETAILS,
                     room.PlayerDetails
                 );
                 // Replace with user ID or something similar
-                socket.to(roomId).emit(MessageType.PLAYER_JOINED_ROOM, "user");
+                socket
+                    .to(roomId)
+                    .emit(RoomMessageType.PLAYER_JOINED_ROOM, "user");
             }
         );
     });
 
-    socket.on(MessageType.LEAVE_ROOM, (roomId: string) => {
+    socket.on(RoomMessageType.LEAVE_ROOM, (roomId: string) => {
         console.log(`user leaving room ${roomId}`);
         const room = roomIdsToRooms.get(roomId);
         if (!room) {
@@ -187,8 +193,11 @@ io.on("connection", (socket: Socket) => {
         socket.leave(roomId);
         // Replace with user ID or something similar
         if (room?.NPlayers > 0) {
-            io.to(roomId).emit(MessageType.ROOM_DETAILS, room.PlayerDetails);
-            socket.to(roomId).emit(MessageType.PLAYER_LEFT_ROOM, "user");
+            io.to(roomId).emit(
+                RoomMessageType.ROOM_DETAILS,
+                room.PlayerDetails
+            );
+            socket.to(roomId).emit(RoomMessageType.PLAYER_LEFT_ROOM, "user");
         } else {
             roomIdsToRooms.delete(roomId);
         }

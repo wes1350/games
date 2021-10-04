@@ -1,52 +1,29 @@
-import { GameType } from "@common/enums/GameType";
-import { Engine as DominoesEngine } from "@common/games/dominoes/Engine";
-import { GameConfigMessage } from "@common/interfaces/GameConfigDescriptionMessage";
+import _ from "lodash";
+import { GameType } from "./common/enums/GameType";
+import { Engine as DominoesEngine } from "./games/dominoes/Engine";
+import { GameConfigMessage as DominoesGameConfigMessage } from "./games/dominoes/interfaces/GameConfigMessage";
+import { PlayerDetails } from "./interfaces/PlayerDetails";
 
 export class GameManager {
     public static async RunGame(
-        config: GameConfigMessage,
+        gameConfig: any,
+        playerDetails: PlayerDetails[],
         broadcast: (type: any, payload: any) => void,
-        emitToPlayer: (type: any, payload: any, player: number) => void,
-        queryPlayer: (type: any, payload: any, player: number) => Promise<any>
+        emitToPlayer: (type: any, payload: any, playerId: string) => void,
+        queryPlayer: (type: any, payload: any, playerId: string) => Promise<any>
     ) {
-        const gameType = config.gameType;
+        const gameType = gameConfig.gameType;
 
         if (gameType === GameType.DOMINOES) {
+            const config = gameConfig as DominoesGameConfigMessage;
             const engine = new DominoesEngine(
                 config,
+                playerDetails,
                 emitToPlayer,
                 broadcast,
                 queryPlayer
             );
-            engine.InitializeRound(true);
-            this.players.forEach((player: number) => {
-                const gameDetails = {
-                    players: this.getPlayerRepresentationsForSeat(player),
-                    config: {
-                        n_dominoes: config.HandSize
-                    }
-                };
-                const socket = this.getSocketFromId(
-                    this.playersToSocketIds.get(player)
-                );
-                socket.emit(MessageType.GAME_START, gameDetails);
-                socket.emit(MessageType.HAND, engine.Players[player].HandRep);
-            });
             engine.RunGame();
         }
     }
-
-    // private getNameBySeat = (seat: number) => {
-    //     return this.socketIdsToNames.get(this.playersToSocketIds.get(seat));
-    // };
-
-    // private getPlayerRepresentationsForSeat(
-    //     seatNumber: number
-    // ): { seatNumber: number; name: string; isMe: boolean }[] {
-    //     return this.players.map((_p, i) => ({
-    //         seatNumber: i,
-    //         name: this.getNameBySeat(i),
-    //         isMe: i === seatNumber
-    //     }));
-    // }
 }

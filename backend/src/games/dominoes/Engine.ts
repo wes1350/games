@@ -4,73 +4,101 @@ import { Domino } from "./Domino";
 import { Pack } from "./Pack";
 import { Player } from "./Player";
 import * as _ from "lodash";
-import { MessageType } from "./enums/MessageType";
+import { GameMessageType } from "./enums/GameMessageType";
 import { QueryType } from "./enums/QueryType";
 import { Direction } from "./enums/Direction";
 import { PossiblePlaysMessage } from "./interfaces/PossiblePlaysMessage";
 import { GameState } from "./interfaces/GameState";
+import { GameConfigMessage } from "./interfaces/GameConfigMessage";
+import { PlayerDetails } from "../../interfaces/PlayerDetails";
 
 export class Engine {
     private _config: Config;
-    private _n_players: number;
-    private _hand_size: number;
-    private _win_threshold: number;
-    private _check_5_doubles: boolean;
     private _players: Player[];
     private _board: Board;
     private _pack: Pack;
-    private _current_player: number;
-    private _n_passes: number;
-    private _shout: (type: MessageType, payload?: any) => void;
-    private _whisper: (type: MessageType, payload: any, index: number) => void;
-    private _query: (
+    private _currentPlayerIndex: number;
+    private _nPasses: number;
+    private _broadcast: (type: GameMessageType, payload?: any) => void;
+    private _emitToPlayer: (
+        type: GameMessageType,
+        payload: any,
+        playerId: string
+    ) => void;
+    private _queryPlayer: (
         type: QueryType,
         message: string,
-        player: number,
+        playerId: string,
         options: any,
         gameState: GameState
     ) => Promise<any>;
     private _local?: boolean;
 
     public constructor(
-        configDescription: GameConfigDescriptionMessage,
-        whisper_f: (
-            type: MessageType,
+        config: GameConfigMessage,
+        playerDetails: PlayerDetails[],
+        emitToPlayer: (
+            type: any,
             payload: any,
-            index: number
+            playerId: string
         ) => void = null,
-        shout_f: (type: MessageType, payload?: any) => void = null,
-        query_f: (
-            type: QueryType,
-            message: string,
-            player: number,
+        broadcast: (type: any, payload?: any) => void = null,
+        queryPlayer: (
+            type: any,
+            payload: any,
+            playerId: string,
             options: any,
             gameState: GameState
         ) => Promise<any> = null,
         local?: boolean
     ) {
-        this._config = new Config(configDescription);
-        this._n_players = n_players ?? this._config.NPlayers;
-        this._hand_size = this._config.HandSize;
-        this._win_threshold = this._config.WinThreshold;
-        this._check_5_doubles = this._config.Check5Doubles;
+        this._config = new Config(config);
         this._players = [];
         this._board = null;
         this._pack = null;
-        for (let i = 0; i < this._n_players; i++) {
-            this._players.push(new Player(i));
-        }
-        this._current_player = null;
-        this._n_passes = 0;
+        const playerOrder = _.shuffle(_.range(playerDetails.length));
+        playerDetails.forEach((playerInfo, i) => {
+            this._players.push(
+                new Player(playerInfo.id, playerOrder[i], playerInfo.name)
+            );
+        });
 
-        this._shout = shout_f;
-        this._whisper = whisper_f;
-        this._query = query_f;
+        this._currentPlayerIndex = null;
+        this._nPasses = 0;
+
+        this._broadcast = broadcast;
+        this._emitToPlayer = emitToPlayer;
+        this._queryPlayer = queryPlayer;
         this._local = local;
     }
 
-    public async RunGame(): Promise<number> {
+    private getInitialPlayerRepresentationsForPlayer(
+        playerId: string
+    ): { seatNumber: number; name: string; isMe: boolean }[] {
+        return this._players.map((player) => ({
+            seatNumber: player.Index,
+            name: player.Name,
+            isMe: player.Id === playerId
+        }));
+    }
+
+    private getPlayerByIndex(index: number): Player {
+        return this._players.find((player) => player.Index === index);
+    }
+
+    public async RunGame(): Promise<string> {
         // Start and run a game until completion, handling game logic as necessary.
+        this.InitializeRound(true);
+        this._players.forEach((player: Player) => {
+            this._emitToPlayer(
+                GameMessageType.GAME_START,
+                this.getInitialPlayerRepresentationsForPlayer(player.Id),
+                player.Id
+            );
+            this._emitToPlayer(GameMessageType.HAND, player.HandRep, player.Id);
+        });
+
+        // this._shout(GameGameMessageType.HAND, gameDetails);
         let next_round_fresh = await this.PlayRound(true);
         while (!this.GameIsOver()) {
             this.InitializeRound(next_round_fresh);
@@ -82,21 +110,21 @@ export class Engine {
         const winner = scores.findIndex(
             (score: number) => score === Math.max(...scores)
         );
-        return winner;
+        return this.getPlayerByIndex(winner).Id;
     }
 
     public InitializeRound(fresh_round = false) {
         this._board = new Board();
         this.DrawHands(fresh_round);
-        this._shout(MessageType.CLEAR_BOARD);
+        this._broadcast(GameMessageType.CLEAR_BOARD);
     }
 
     public async PlayRound(fresh_round = false) {
         if (fresh_round) {
-            this._current_player = this.DetermineFirstPlayer();
+            this._currentPlayerIndex = this.DetermineFirstPlayer();
         }
-        this._shout(MessageType.NEW_ROUND, {
-            currentPlayer: this.CurrentPlayer
+        this._broadcast(GameMessageType.NEW_ROUND, {
+            currentPlayer: this.CurrentPlayer.Index
         });
         let blocked = false;
         let play_fresh = fresh_round;
@@ -111,25 +139,28 @@ export class Engine {
         }
 
         if (!this.PlayersHaveDominoes()) {
-            this._current_player =
-                (this.CurrentPlayer + this._n_players - 1) % this._n_players;
-            const scoreOnDomino = this.GetValueOnDomino(this.CurrentPlayer);
-            this._players[this.CurrentPlayer].AddPoints(scoreOnDomino);
-            this._shout(MessageType.SCORE, {
+            this._currentPlayerIndex =
+                (this.CurrentPlayer.Index + this._config.NPlayers - 1) %
+                this._config.NPlayers;
+            const scoreOnDomino = this.GetValueOnDomino(
+                this.CurrentPlayer.Index
+            );
+            this.CurrentPlayer.AddPoints(scoreOnDomino);
+            this._broadcast(GameMessageType.SCORE, {
                 seat: this.CurrentPlayer,
                 score: scoreOnDomino
             });
-            this._shout(MessageType.PLAYER_DOMINOED);
+            this._broadcast(GameMessageType.PLAYER_DOMINOED);
             return false;
         } else if (blocked) {
-            this._shout(MessageType.GAME_BLOCKED);
+            this._broadcast(GameMessageType.GAME_BLOCKED);
             let [blocked_scorer, points] = this.GetBlockedResult();
             if (blocked_scorer !== null) {
-                this._shout(MessageType.SCORE, {
+                this._broadcast(GameMessageType.SCORE, {
                     seat: blocked_scorer,
                     score: points
                 });
-                this._players[blocked_scorer].AddPoints(points);
+                this.getPlayerByIndex(blocked_scorer).AddPoints(points);
             }
             return true;
         } else {
@@ -139,7 +170,7 @@ export class Engine {
     }
 
     public async PlayTurn(play_fresh = false) {
-        const move = await this.queryMove(this.CurrentPlayer, play_fresh);
+        const move = await this.queryMove(this._currentPlayerIndex, play_fresh);
         if (move === null) {
             // Temporary case for disconnects
             return null;
@@ -149,8 +180,8 @@ export class Engine {
         if (domino !== null) {
             const addedCoordinate = this._board.AddDomino(domino, direction);
             const placementRep = this.GetPlacementRep(domino, direction);
-            this._players[this.CurrentPlayer].RemoveDomino(domino);
-            this._shout(MessageType.TURN, {
+            this.CurrentPlayer.RemoveDomino(domino);
+            this._broadcast(GameMessageType.TURN, {
                 seat: this.CurrentPlayer,
                 domino: {
                     Face1: domino.Big,
@@ -163,37 +194,37 @@ export class Engine {
                 }
             });
 
-            this._whisper(
-                MessageType.HAND,
-                this._players[this.CurrentPlayer].HandRep,
-                this.CurrentPlayer
+            this._emitToPlayer(
+                GameMessageType.HAND,
+                this.CurrentPlayer.HandRep,
+                this.CurrentPlayer.Id
             );
 
-            this._shout(MessageType.DOMINO_PLAYED, {
+            this._broadcast(GameMessageType.DOMINO_PLAYED, {
                 seat: this.CurrentPlayer
             });
 
             if (this._board.Score) {
-                this._shout(MessageType.SCORE, {
+                this._broadcast(GameMessageType.SCORE, {
                     seat: this.CurrentPlayer,
                     score: this._board.Score
                 });
             }
 
-            this._players[this.CurrentPlayer].AddPoints(this._board.Score);
-            this._n_passes = 0;
+            this.CurrentPlayer.AddPoints(this._board.Score);
+            this._nPasses = 0;
         } else {
             // Player passes
-            this._n_passes += 1;
+            this._nPasses += 1;
 
-            this._shout(MessageType.TURN, {
+            this._broadcast(GameMessageType.TURN, {
                 seat: this.CurrentPlayer,
                 domino: null,
                 direction: null,
                 coordinate: null
             });
         }
-        if (this._n_passes == this._n_players) {
+        if (this._nPasses == this._config.NPlayers) {
             return true;
         }
 
@@ -207,23 +238,27 @@ export class Engine {
 
     public NextTurn() {
         // Update the player to move.
-        this._current_player = (this.CurrentPlayer + 1) % this._n_players;
+        this._currentPlayerIndex =
+            (this.CurrentPlayer.Index + 1) % this._config.NPlayers;
     }
 
     public DrawHands(fresh_round = false) {
         while (true) {
             this._pack = new Pack();
             const hands = [];
-            for (let i = 0; i < this._n_players; i++) {
-                hands.push(this._pack.Pull(this._hand_size));
+            for (let i = 0; i < this._config.NPlayers; i++) {
+                hands.push(this._pack.Pull(this._config.HandSize));
             }
-            if (this.VerifyHands(hands, fresh_round, this._check_5_doubles)) {
-                for (let i = 0; i < this._n_players; i++) {
-                    this._players[i].AssignHand(hands[i]);
-                    this._whisper(
-                        MessageType.HAND,
-                        this._players[i].HandRep,
-                        i
+            if (
+                this.VerifyHands(hands, fresh_round, this._config.Check5Doubles)
+            ) {
+                for (let i = 0; i < this._config.NPlayers; i++) {
+                    const player = this.getPlayerByIndex(i);
+                    player.AssignHand(hands[i]);
+                    this._emitToPlayer(
+                        GameMessageType.HAND,
+                        player.HandRep,
+                        player.Id
                     );
                 }
                 return;
@@ -267,8 +302,8 @@ export class Engine {
         // Determine who has the largest double, and thus who will play first.
         // Assumes each player's hand is assigned and a double exists among them.
         for (let i = 6; i >= 0; i--) {
-            for (let p = 0; p < this._n_players; p++) {
-                for (const domino of this._players[p].Hand) {
+            for (let p = 0; p < this._config.NPlayers; p++) {
+                for (const domino of this.getPlayerByIndex(p).Hand) {
                     if (domino.Equals(new Domino(i, i))) {
                         return p;
                     }
@@ -283,24 +318,21 @@ export class Engine {
     }
 
     public GameIsOver() {
-        return Math.max(...this.GetScores()) >= this._win_threshold;
+        return Math.max(...this.GetScores()) >= this._config.WinThreshold;
     }
 
     public GetScores(): number[] {
-        return this._players.map((p, i) => this.GetPlayerScore(i));
-    }
-
-    public GetPlayerScore(player: number) {
-        return this._players[player].Score;
+        return this._players.map((player) => player.Score);
     }
 
     public async queryMove(
-        player: number,
+        playerIndex: number,
         play_fresh = false
     ): Promise<{ domino: Domino; direction: Direction }> {
+        const player = this.getPlayerByIndex(playerIndex);
         while (true) {
             const possible_placements = this._board.GetValidPlacementsForHand(
-                this._players[player].Hand,
+                player.Hand,
                 play_fresh
             );
             if (this._local) {
@@ -330,18 +362,18 @@ export class Engine {
             );
             if (move_possible) {
                 try {
-                    this._whisper(
-                        MessageType.POSSIBLE_PLAYS,
+                    this._emitToPlayer(
+                        GameMessageType.POSSIBLE_PLAYS,
                         possiblePlays,
-                        player
+                        player.Id
                     );
                     const response: { domino: number; direction: string } =
-                        await this._query(
+                        await this._queryPlayer(
                             QueryType.MOVE,
-                            `Player ${player}, make a move`,
-                            player,
+                            `${player.Name}, make a move`,
+                            player.Id,
                             possiblePlays.plays,
-                            this.getGameStateForPlayer(player)
+                            this.getGameStateForPlayer(player.Index)
                         );
                     if (response === null) {
                         // Temporary case for disconnects
@@ -357,10 +389,10 @@ export class Engine {
                         ) ||
                         possible_placements[dominoIndex].dirs.length === 0
                     ) {
-                        this._whisper(
-                            MessageType.ERROR,
+                        this._emitToPlayer(
+                            GameMessageType.ERROR,
                             "Invalid domino choice: " + dominoIndex.toString(),
-                            player
+                            player.Id
                         );
                         continue;
                     }
@@ -375,11 +407,11 @@ export class Engine {
                                 direction
                             )
                         ) {
-                            this._whisper(
-                                MessageType.ERROR,
+                            this._emitToPlayer(
+                                GameMessageType.ERROR,
                                 "Invalid domino choice: " +
                                     dominoIndex.toString(),
-                                player
+                                player.Id
                             );
                             continue;
                         }
@@ -391,24 +423,24 @@ export class Engine {
                     };
                 } catch (err) {
                     console.error(err);
-                    this._whisper(
-                        MessageType.ERROR,
+                    this._emitToPlayer(
+                        GameMessageType.ERROR,
                         "Invalid input, try again",
-                        player
+                        player.Id
                     );
                 }
             } else {
                 const pulled = this._pack.Pull();
 
                 if (pulled !== null) {
-                    this._shout(MessageType.PULL, {
+                    this._broadcast(GameMessageType.PULL, {
                         seat: this.CurrentPlayer
                     });
-                    this._players[player].AddDomino(pulled[0]);
-                    this._whisper(
-                        MessageType.HAND,
-                        this._players[player].HandRep,
-                        player
+                    player.AddDomino(pulled[0]);
+                    this._emitToPlayer(
+                        GameMessageType.HAND,
+                        player.HandRep,
+                        player.Id
                     );
                 } else {
                     return { domino: null, direction: null };
@@ -417,11 +449,11 @@ export class Engine {
         }
     }
 
-    public GetValueOnDomino(player: number) {
+    public GetValueOnDomino(playerIndex: number) {
         // Get the value of a 'Domino' by a player, i.e. the sum, rounded to the
         // nearest 5, of the other players' hand totals.
         let total = this._players
-            .filter((p, i) => i !== player)
+            .filter((player) => player.Index !== playerIndex)
             .map((p) => p.HandTotal)
             .reduce((a, b) => a + b, 0);
 
@@ -434,22 +466,24 @@ export class Engine {
     }
 
     public GetBlockedResult() {
-        // Find the player (if any) that wins points when the game === blocked && return
-        // that player && the points they receive.
+        // Find the player (if any) that wins points when the game is blocked and return
+        // that player and the points they receive.
         const totals = this._players.map((p) => p.HandTotal);
         if (totals.filter((t) => t === Math.min(...totals)).length > 1) {
             // Multiple players have lowest count, so nobody gets points
             return [null, 0];
         } else {
-            // Find the player with minimum score && the sum of the other players' hands, rounded to the nearest 5
-            const scorer = totals.indexOf(Math.min(...totals));
+            // Find the player with minimum score and the sum of the other players' hands, rounded to the nearest 5
+            const scorer = this._players.find(
+                (player) => player.Score === Math.min(...totals)
+            );
             let total = totals.reduce((a, b) => a + b, 0) - Math.min(...totals);
             if (total % 5 > 2) {
                 total += 5 - (total % 5);
             } else {
                 total -= total % 5;
             }
-            return [scorer, total];
+            return [scorer.Index, total];
         }
     }
 
@@ -507,14 +541,14 @@ export class Engine {
         return this._players;
     }
 
-    public get CurrentPlayer(): number {
-        return this._current_player;
+    public get CurrentPlayer(): Player {
+        return this.getPlayerByIndex(this._currentPlayerIndex);
     }
 
     private getPlayerDescriptionOfSelf(seat: number, player: Player) {
         return {
             seatNumber: seat,
-            score: this.GetPlayerScore(seat),
+            score: player.Score,
             hand: player.Hand.map((domino) => ({
                 head: domino.Head,
                 tail: domino.Tail
@@ -525,14 +559,14 @@ export class Engine {
     private getPlayerDescriptionOfOpponent(seat: number, opponent: Player) {
         return {
             seatNumber: seat,
-            score: this.GetPlayerScore(seat),
+            score: opponent.Score,
             dominoesInHand: opponent.Hand.length
         };
     }
 
     private getPlayerRepresentations(seat: number) {
-        const me = this._players.find((p) => p.Id === seat);
-        const opponents = this._players.filter((p) => p.Id !== seat);
+        const me = this._players.find((p) => p.Index === seat);
+        const opponents = this._players.filter((p) => p.Index !== seat);
         return {
             me: this.getPlayerDescriptionOfSelf(seat, me),
             opponents: opponents.map((opponent) =>
@@ -544,7 +578,7 @@ export class Engine {
     private getGameStateForPlayer(player: number): GameState {
         return {
             config: this._config.ConfigDescription,
-            seatNumberForTurn: this._current_player, // maybe need to go back one player for event notification, depending on call order
+            seatNumberForTurn: this._currentPlayerIndex, // maybe need to go back one player for event notification, depending on call order
             spinner: this._board.Spinner,
             board: this._board.DominoRepresentations,
             players: this.getPlayerRepresentations(player)

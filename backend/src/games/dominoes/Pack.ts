@@ -1,5 +1,5 @@
+import _ from "lodash";
 import { Domino } from "./Domino";
-import { getRandomInt } from "./utils";
 
 export class Pack {
     private _dominoes: Domino[];
@@ -19,7 +19,7 @@ export class Pack {
                 return null;
             }
             return this._dominoes.splice(
-                getRandomInt(0, this._dominoes.length),
+                _.random(this._dominoes.length - 1),
                 1
             );
         } else {
@@ -27,7 +27,7 @@ export class Pack {
             for (let i = 0; i < n; i++) {
                 pulled.push(
                     this._dominoes.splice(
-                        getRandomInt(0, this._dominoes.length),
+                        _.random(this._dominoes.length - 1),
                         1
                     )[0]
                 );

@@ -1,14 +1,18 @@
 import { Domino } from "./Domino";
 
 export class Player {
-    private _id: number;
+    private _id: string;
+    private _index: number;
     private _hand: Domino[];
+    private _name: string;
     private _score: number;
 
-    constructor(_id: number, score = 0) {
-        this._id = _id;
+    constructor(id: string, index: number, name: string) {
+        this._id = id;
+        this._index = index;
         this._hand = [];
-        this._score = score;
+        this._name = name;
+        this._score = 0;
     }
 
     public AssignHand(hand: Domino[]) {
@@ -22,7 +26,7 @@ export class Player {
     public RemoveDomino(domino: Domino) {
         const requestedDomino = this._hand.find((d) => d.Equals(domino));
         if (!requestedDomino) {
-            throw new Error(`Could not find domino${domino.Rep} in hand.`);
+            throw new Error(`Could not find domino ${domino.Rep} in hand.`);
         } else {
             this._hand = this._hand.filter((d) => !d.Equals(domino));
             return requestedDomino;
@@ -33,8 +37,16 @@ export class Player {
         this._score += points;
     }
 
-    public get Id(): number {
+    public get Id(): string {
         return this._id;
+    }
+
+    public get Index(): number {
+        return this._index;
+    }
+
+    public get Name(): string {
+        return this._name;
     }
 
     public get Score(): number {
