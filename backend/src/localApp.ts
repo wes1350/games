@@ -3,7 +3,6 @@ import _ from "lodash";
 import { Agent } from "./games/dominoes/agents/Agent";
 import RandomAgent from "./games/dominoes/agents/RandomAgent";
 import GreedyAgent from "./games/dominoes/agents/GreedyAgent";
-// import { QueryType } from "./games/dominoes/enums/QueryType";
 import { Direction } from "./games/dominoes/enums/Direction";
 import { GameState } from "./games/dominoes/interfaces/GameState";
 import { GameMessageType } from "./games/dominoes/enums/GameMessageType";
@@ -17,10 +16,10 @@ const playerMap = {
     RandomAgent: RandomAgent
 };
 
-const N_Humans = 2;
-// const agents = [RandomAgent];
+const N_Humans = 1;
+const agents = [RandomAgent];
 // const agents = [GreedyAgent];
-const agents: Agent[] = [];
+// const agents: Agent[] = [];
 let players: Agent[] = _.flatten([
     _.range(N_Humans).map((i) => playerMap["Human"]),
     agents

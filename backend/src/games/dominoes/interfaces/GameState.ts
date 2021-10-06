@@ -1,7 +1,7 @@
-import { GameConfigDescription } from "./GameConfigDescription";
+import { Board } from "./Board";
 
 export interface GameState {
-    config: GameConfigDescription;
+    config: any; //GameConfigDescription; // Need to figure out imports with common, etc.
     seatNumberForTurn: number;
     players: {
         me: {
@@ -15,6 +15,5 @@ export interface GameState {
             dominoesInHand: number;
         }[];
     };
-    board: { head: number; tail: number; x: number; y: number }[];
-    spinner: number;
+    board: Board;
 }

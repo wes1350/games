@@ -1,6 +1,5 @@
-import { Board } from "./Board";
+import { Board } from "./interfaces/Board";
 import { Config } from "./Config";
-import { Domino } from "./Domino";
 import { Pack } from "./Pack";
 import { Player } from "./Player";
 import * as _ from "lodash";
@@ -11,6 +10,11 @@ import { PossiblePlaysMessage } from "./interfaces/PossiblePlaysMessage";
 import { GameState } from "./interfaces/GameState";
 import { GameConfigMessage } from "./interfaces/GameConfigMessage";
 import { PlayerDetails } from "../../interfaces/PlayerDetails";
+import { BoardUtils } from "./BoardUtils";
+import { BoardController } from "./BoardController";
+import { BoardViewModel } from "./BoardViewModel";
+import { Domino } from "./interfaces/Domino";
+import { DominoViewModel } from "./DominoViewModel";
 
 export class Engine {
     private _config: Config;
@@ -112,7 +116,7 @@ export class Engine {
     }
 
     public InitializeRound(fresh_round = false) {
-        this._board = new Board();
+        this._board = BoardUtils.Initialize();
         this.DrawHands(fresh_round);
         this._broadcast(GameMessageType.CLEAR_BOARD);
     }
@@ -179,15 +183,19 @@ export class Engine {
         const domino = move.domino;
         const direction = move.direction;
         if (domino !== null) {
-            this._board.AddDomino(domino, direction);
+            this._board = BoardController.AddDomino(
+                this._board,
+                domino,
+                direction
+            );
             // const addedCoordinate = this._board.AddDomino(domino, direction);
             // const placementRep = this.GetPlacementRep(domino, direction);
             this.CurrentPlayer.RemoveDomino(domino);
             this._broadcast(GameMessageType.TURN, {
                 seat: this.CurrentPlayer.Index,
                 domino: {
-                    Face1: domino.Big,
-                    Face2: domino.Small
+                    head: domino.head,
+                    tail: domino.tail
                 },
                 direction: null,
                 // direction: placementRep.direction,
@@ -200,7 +208,7 @@ export class Engine {
 
             this._emitToPlayer(
                 GameMessageType.HAND,
-                this.CurrentPlayer.HandRep,
+                this.CurrentPlayer.HandTextRep,
                 this.CurrentPlayer.Id
             );
 
@@ -208,14 +216,16 @@ export class Engine {
                 seat: this.CurrentPlayer.Index
             });
 
-            if (this._board.Score) {
+            const score = BoardViewModel.Score(this._board);
+
+            if (score) {
                 this._broadcast(GameMessageType.SCORE, {
                     seat: this.CurrentPlayer.Index,
-                    score: this._board.Score
+                    score
                 });
             }
 
-            this.CurrentPlayer.AddPoints(this._board.Score);
+            this.CurrentPlayer.AddPoints(score);
             this._nPasses = 0;
         } else {
             // Player passes
@@ -233,7 +243,7 @@ export class Engine {
         }
 
         if (this._local) {
-            console.log("\n\n" + this._board.Rep + "\n");
+            console.log("\n\n" + BoardViewModel.TextRep(this._board) + "\n");
             console.log("scores:", this.GetScores(), "\n");
         }
 
@@ -261,7 +271,7 @@ export class Engine {
                     player.AssignHand(hands[i]);
                     this._emitToPlayer(
                         GameMessageType.HAND,
-                        player.HandRep,
+                        player.HandTextRep,
                         player.Id
                     );
                 }
@@ -282,7 +292,9 @@ export class Engine {
         // Check that no hand has 5 doubles
         let no_doubles = true;
         hands.forEach((hand) => {
-            const n_doubles = hand.filter((d) => d.IsDouble).length;
+            const n_doubles = hand.filter((d) =>
+                DominoViewModel.IsDouble(d)
+            ).length;
             if (check_5_doubles) {
                 if (n_doubles >= 5) {
                     return false;
@@ -308,7 +320,7 @@ export class Engine {
         for (let i = 6; i >= 0; i--) {
             for (let p = 0; p < this._config.NPlayers; p++) {
                 for (const domino of this.getPlayerByIndex(p).Hand) {
-                    if (domino.Equals(new Domino(i, i))) {
+                    if (domino.head === i && domino.tail === i) {
                         return p;
                     }
                 }
@@ -335,7 +347,8 @@ export class Engine {
     ): Promise<{ domino: Domino; direction: Direction }> {
         const player = this.getPlayerByIndex(playerIndex);
         while (true) {
-            const possible_placements = this._board.GetValidPlacementsForHand(
+            const possible_placements = BoardUtils.GetValidPlacementsForHand(
+                this._board,
                 player.Hand,
                 play_fresh
             );
@@ -343,9 +356,9 @@ export class Engine {
                 console.log("Possible placements:");
                 possible_placements.forEach((el) => {
                     console.log(
-                        ` --- ${el.index}: ${el.domino.Rep}, [${el.dirs.join(
-                            ", "
-                        )}]`
+                        ` --- ${el.index}: ${DominoViewModel.TextRep(
+                            el.domino
+                        )}, [${el.dirs.join(", ")}]`
                     );
                 });
             }
@@ -443,7 +456,7 @@ export class Engine {
                     player.AddDomino(pulled[0]);
                     this._emitToPlayer(
                         GameMessageType.HAND,
-                        player.HandRep,
+                        player.HandTextRep,
                         player.Id
                     );
                 } else {
@@ -554,8 +567,8 @@ export class Engine {
             seatNumber: seat,
             score: player.Score,
             hand: player.Hand.map((domino) => ({
-                head: domino.Head,
-                tail: domino.Tail
+                head: domino.head,
+                tail: domino.tail
             }))
         };
     }
@@ -579,14 +592,12 @@ export class Engine {
         };
     }
 
-    private getGameStateForPlayer(player: number): GameState {
+    private getGameStateForPlayer(playerIndex: number): GameState {
         return {
             config: this._config.ConfigDescription,
             seatNumberForTurn: this._currentPlayerIndex, // maybe need to go back one player for event notification, depending on call order
-            spinner: this._board.Spinner?.Head,
-            // board: this._board.DominoRepresentations,
-            board: null,
-            players: this.getPlayerRepresentations(player)
+            board: this._board,
+            players: this.getPlayerRepresentations(playerIndex)
         };
     }
 }
