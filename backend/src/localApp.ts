@@ -97,7 +97,7 @@ const emitToPlayer = (type: any, payload: any, playerId: string) => {
     );
 };
 
-const typesToIgnore = [GameMessageType.CLEAR_BOARD];
+const typesToIgnore: GameMessageType[] = [];
 
 const broadcast = (type: any, payload?: any) => {
     // Add log shouting in here based on parameters
@@ -124,5 +124,4 @@ const engine = new DominoesEngine(
     queryPlayer,
     true
 );
-// engine.InitializeRound(true);
 engine.RunGame().then(() => console.log("game over!"));

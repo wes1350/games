@@ -15,6 +15,10 @@ import { AddDomino } from "./BoardController";
 import { ScoreBoard, BoardTextRep } from "./BoardViewModel";
 import { DominoTextRep, IsDouble } from "./DominoViewModel";
 import { GetValidPlacementsForHand, InitializeBoard } from "./BoardUtils";
+import { NewRoundMessagePayload } from "./interfaces/NewRoundMessagePayload";
+import { ScoreMessagePayload } from "./interfaces/ScoreMessagePayload";
+import { TurnMessagePayload } from "./interfaces/TurnMessagePayload";
+import { PullMessagePayload } from "./interfaces/PullMessagePayload";
 
 export class Engine {
     private _config: Config;
@@ -118,7 +122,6 @@ export class Engine {
     public InitializeRound(fresh_round = false) {
         this._board = InitializeBoard();
         this.DrawHands(fresh_round);
-        this._broadcast(GameMessageType.CLEAR_BOARD);
     }
 
     public async PlayRound(fresh_round = false) {
@@ -127,7 +130,7 @@ export class Engine {
         }
         this._broadcast(GameMessageType.NEW_ROUND, {
             currentPlayer: this.CurrentPlayer.Index
-        });
+        } as NewRoundMessagePayload);
         let blocked = false;
         let play_fresh = fresh_round;
         while (this.PlayersHaveDominoes() && !blocked && !this.GameIsOver()) {
@@ -151,7 +154,7 @@ export class Engine {
             this._broadcast(GameMessageType.SCORE, {
                 seat: this.CurrentPlayer.Index,
                 score: scoreOnDomino
-            });
+            } as ScoreMessagePayload);
             this._broadcast(GameMessageType.PLAYER_DOMINOED);
             return false;
         } else if (blocked) {
@@ -164,7 +167,7 @@ export class Engine {
                 this._broadcast(GameMessageType.SCORE, {
                     seat: player.Index,
                     score: total
-                });
+                } as ScoreMessagePayload);
                 player.AddPoints(total);
             }
             return true;
@@ -189,28 +192,15 @@ export class Engine {
             this.CurrentPlayer.RemoveDomino(domino);
             this._broadcast(GameMessageType.TURN, {
                 seat: this.CurrentPlayer.Index,
-                domino: {
-                    head: domino.head,
-                    tail: domino.tail
-                },
-                direction: null,
-                // direction: placementRep.direction,
-                coordinate: null
-                // coordinate: {
-                //     X: addedCoordinate.x,
-                //     Y: addedCoordinate.y
-                // }
-            });
+                domino,
+                direction
+            } as TurnMessagePayload);
 
             this._emitToPlayer(
                 GameMessageType.HAND,
-                this.CurrentPlayer.HandTextRep,
+                this.CurrentPlayer.Hand,
                 this.CurrentPlayer.Id
             );
-
-            this._broadcast(GameMessageType.DOMINO_PLAYED, {
-                seat: this.CurrentPlayer.Index
-            });
 
             const score = ScoreBoard(this._board);
 
@@ -218,7 +208,7 @@ export class Engine {
                 this._broadcast(GameMessageType.SCORE, {
                     seat: this.CurrentPlayer.Index,
                     score
-                });
+                } as ScoreMessagePayload);
             }
 
             this.CurrentPlayer.AddPoints(score);
@@ -230,9 +220,8 @@ export class Engine {
             this._broadcast(GameMessageType.TURN, {
                 seat: this.CurrentPlayer.Index,
                 domino: null,
-                direction: null,
-                coordinate: null
-            });
+                direction: null
+            } as TurnMessagePayload);
         }
         if (this._nPasses == this._config.NPlayers) {
             return true;
@@ -267,7 +256,7 @@ export class Engine {
                     player.AssignHand(hands[i]);
                     this._emitToPlayer(
                         GameMessageType.HAND,
-                        player.HandTextRep,
+                        player.Hand,
                         player.Id
                     );
                 }
@@ -335,7 +324,7 @@ export class Engine {
         return this._players.map((player) => player.Score);
     }
 
-    public async queryMove(
+    private async queryMove(
         playerIndex: number,
         play_fresh = false
     ): Promise<{ domino: Domino; direction: Direction }> {
@@ -446,11 +435,11 @@ export class Engine {
                 if (pulled !== null) {
                     this._broadcast(GameMessageType.PULL, {
                         seat: this.CurrentPlayer.Index
-                    });
+                    } as PullMessagePayload);
                     player.AddDomino(pulled[0]);
                     this._emitToPlayer(
                         GameMessageType.HAND,
-                        player.HandTextRep,
+                        player.Hand,
                         player.Id
                     );
                 } else {
