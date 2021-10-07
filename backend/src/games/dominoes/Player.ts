@@ -1,4 +1,4 @@
-import { DominoViewModel } from "./DominoViewModel";
+import { DominoTextRep, Equals, Total } from "./DominoViewModel";
 import { Domino } from "./interfaces/Domino";
 
 export class Player {
@@ -25,19 +25,13 @@ export class Player {
     }
 
     public RemoveDomino(domino: Domino) {
-        const requestedDomino = this._hand.find((d) =>
-            DominoViewModel.Equals(domino, d)
-        );
+        const requestedDomino = this._hand.find((d) => Equals(domino, d));
         if (!requestedDomino) {
             throw new Error(
-                `Could not find domino ${DominoViewModel.TextRep(
-                    domino
-                )} in hand.`
+                `Could not find domino ${DominoTextRep(domino)} in hand.`
             );
         } else {
-            this._hand = this._hand.filter(
-                (d) => !DominoViewModel.Equals(domino, d)
-            );
+            this._hand = this._hand.filter((d) => !Equals(domino, d));
             return requestedDomino;
         }
     }
@@ -68,7 +62,7 @@ export class Player {
 
     public get HandTotal(): number {
         return this._hand
-            .map((domino) => DominoViewModel.Total(domino))
+            .map((domino) => Total(domino))
             .reduce((a, b) => a + b, 0);
     }
 
