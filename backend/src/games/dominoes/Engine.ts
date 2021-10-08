@@ -133,7 +133,7 @@ export class Engine {
             this._currentPlayerIndex = this.DetermineFirstPlayer();
         }
         this._broadcast(GameMessageType.NEW_ROUND, {
-            currentPlayer: this._players.get(this._currentPlayerIndex).index
+            currentPlayer: this._currentPlayerIndex
         } as NewRoundMessagePayload);
         let blocked = false;
         let play_fresh = fresh_round;
@@ -149,12 +149,10 @@ export class Engine {
 
         if (!this.PlayersHaveDominoes()) {
             this._currentPlayerIndex =
-                (this._players.get(this._currentPlayerIndex).index +
-                    this._config.NPlayers -
-                    1) %
+                (this._currentPlayerIndex + this._config.NPlayers - 1) %
                 this._config.NPlayers;
             const scoreOnDomino = this.GetValueOnDomino(
-                this._players.get(this._currentPlayerIndex).index
+                this._currentPlayerIndex
             );
 
             this._players.set(
@@ -165,7 +163,7 @@ export class Engine {
                 )
             );
             this._broadcast(GameMessageType.SCORE, {
-                seat: this._players.get(this._currentPlayerIndex).index,
+                seat: this._currentPlayerIndex,
                 score: scoreOnDomino
             } as ScoreMessagePayload);
             this._broadcast(GameMessageType.PLAYER_DOMINOED);
@@ -210,7 +208,7 @@ export class Engine {
                 )
             );
             this._broadcast(GameMessageType.TURN, {
-                seat: this._players.get(this._currentPlayerIndex).index,
+                seat: this._currentPlayerIndex,
                 domino,
                 direction
             } as TurnMessagePayload);
@@ -225,7 +223,7 @@ export class Engine {
 
             if (score) {
                 this._broadcast(GameMessageType.SCORE, {
-                    seat: this._players.get(this._currentPlayerIndex).index,
+                    seat: this._currentPlayerIndex,
                     score
                 } as ScoreMessagePayload);
             }
@@ -240,7 +238,7 @@ export class Engine {
             this._nPasses += 1;
 
             this._broadcast(GameMessageType.TURN, {
-                seat: this._players.get(this._currentPlayerIndex).index,
+                seat: this._currentPlayerIndex,
                 domino: null,
                 direction: null
             } as TurnMessagePayload);
@@ -467,10 +465,10 @@ export class Engine {
 
                 if (pulled !== null) {
                     this._broadcast(GameMessageType.PULL, {
-                        seat: this._players.get(this._currentPlayerIndex).index
+                        seat: this._currentPlayerIndex
                     } as PullMessagePayload);
                     this._players.set(
-                        this._players.get(this._currentPlayerIndex).index,
+                        this._currentPlayerIndex,
                         AddDominoToHand(
                             this._players.get(this._currentPlayerIndex),
                             pulled[0]
