@@ -7,7 +7,7 @@ import { Direction } from "./enums/Direction";
 import { Board } from "./interfaces/Board";
 import { Domino } from "./interfaces/Domino";
 
-export const AddDomino = (
+export const AddDominoToBoard = (
     board: Board,
     domino: Domino,
     direction: Direction

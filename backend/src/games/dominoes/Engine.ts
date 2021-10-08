@@ -1,7 +1,6 @@
 import { Board } from "./interfaces/Board";
 import { Config } from "./Config";
 import { Pack } from "./Pack";
-import { Player } from "./Player";
 import * as _ from "lodash";
 import { GameMessageType } from "./enums/GameMessageType";
 import { QueryType } from "./enums/QueryType";
@@ -11,7 +10,7 @@ import { GameState } from "./interfaces/GameState";
 import { GameConfigMessage } from "./interfaces/GameConfigMessage";
 import { PlayerDetails } from "../../interfaces/PlayerDetails";
 import { Domino } from "./interfaces/Domino";
-import { AddDomino } from "./BoardController";
+import { AddDominoToBoard } from "./BoardController";
 import { ScoreBoard, BoardTextRep } from "./BoardViewModel";
 import { DominoTextRep, IsDouble } from "./DominoViewModel";
 import { GetValidPlacementsForHand, InitializeBoard } from "./BoardUtils";
@@ -19,10 +18,18 @@ import { NewRoundMessagePayload } from "./interfaces/NewRoundMessagePayload";
 import { ScoreMessagePayload } from "./interfaces/ScoreMessagePayload";
 import { TurnMessagePayload } from "./interfaces/TurnMessagePayload";
 import { PullMessagePayload } from "./interfaces/PullMessagePayload";
+import { Player } from "./interfaces/Player";
+import { InitializePlayer } from "./PlayerUtils";
+import { HandTotal } from "./PlayerViewModel";
+import {
+    AddDominoToHand,
+    AddPoints,
+    RemoveDominoFromHand
+} from "./PlayerController";
 
 export class Engine {
     private _config: Config;
-    private _players: Player[];
+    private _players: Map<number, Player>;
     private _board: Board;
     private _pack: Pack;
     private _currentPlayerIndex: number;
@@ -61,13 +68,14 @@ export class Engine {
         local?: boolean
     ) {
         this._config = new Config(config);
-        this._players = [];
+        this._players = new Map();
         this._board = null;
         this._pack = null;
         const playerOrder = _.shuffle(_.range(playerDetails.length));
         playerDetails.forEach((playerInfo, i) => {
-            this._players.push(
-                new Player(playerInfo.id, playerOrder[i], playerInfo.name)
+            this._players.set(
+                i,
+                InitializePlayer(playerInfo.id, playerOrder[i], playerInfo.name)
             );
         });
 
@@ -83,15 +91,11 @@ export class Engine {
     private getInitialPlayerRepresentationsForPlayer(
         playerId: string
     ): { seatNumber: number; name: string; isMe: boolean }[] {
-        return this._players.map((player) => ({
-            seatNumber: player.Index,
-            name: player.Name,
-            isMe: player.Id === playerId
+        return Array.from(this._players.values()).map((player) => ({
+            seatNumber: player.index,
+            name: player.name,
+            isMe: player.id === playerId
         }));
-    }
-
-    private getPlayerByIndex(index: number): Player {
-        return this._players.find((player) => player.Index === index);
     }
 
     public async RunGame(): Promise<string> {
@@ -99,8 +103,8 @@ export class Engine {
         this._players.forEach((player: Player) => {
             this._emitToPlayer(
                 GameMessageType.GAME_START,
-                this.getInitialPlayerRepresentationsForPlayer(player.Id),
-                player.Id
+                this.getInitialPlayerRepresentationsForPlayer(player.id),
+                player.id
             );
         });
         this.InitializeRound(true);
@@ -116,7 +120,7 @@ export class Engine {
         const winner = scores.findIndex(
             (score: number) => score === Math.max(...scores)
         );
-        return this.getPlayerByIndex(winner).Id;
+        return this._players.get(winner).id;
     }
 
     public InitializeRound(fresh_round = false) {
@@ -129,7 +133,7 @@ export class Engine {
             this._currentPlayerIndex = this.DetermineFirstPlayer();
         }
         this._broadcast(GameMessageType.NEW_ROUND, {
-            currentPlayer: this.CurrentPlayer.Index
+            currentPlayer: this._players.get(this._currentPlayerIndex).index
         } as NewRoundMessagePayload);
         let blocked = false;
         let play_fresh = fresh_round;
@@ -145,14 +149,23 @@ export class Engine {
 
         if (!this.PlayersHaveDominoes()) {
             this._currentPlayerIndex =
-                (this.CurrentPlayer.Index + this._config.NPlayers - 1) %
+                (this._players.get(this._currentPlayerIndex).index +
+                    this._config.NPlayers -
+                    1) %
                 this._config.NPlayers;
             const scoreOnDomino = this.GetValueOnDomino(
-                this.CurrentPlayer.Index
+                this._players.get(this._currentPlayerIndex).index
             );
-            this.CurrentPlayer.AddPoints(scoreOnDomino);
+
+            this._players.set(
+                this._currentPlayerIndex,
+                AddPoints(
+                    this._players.get(this._currentPlayerIndex),
+                    scoreOnDomino
+                )
+            );
             this._broadcast(GameMessageType.SCORE, {
-                seat: this.CurrentPlayer.Index,
+                seat: this._players.get(this._currentPlayerIndex).index,
                 score: scoreOnDomino
             } as ScoreMessagePayload);
             this._broadcast(GameMessageType.PLAYER_DOMINOED);
@@ -165,10 +178,10 @@ export class Engine {
 
             if (player !== null) {
                 this._broadcast(GameMessageType.SCORE, {
-                    seat: player.Index,
+                    seat: player.index,
                     score: total
                 } as ScoreMessagePayload);
-                player.AddPoints(total);
+                this._players.set(player.index, AddPoints(player, total));
             }
             return true;
         } else {
@@ -186,39 +199,48 @@ export class Engine {
         const domino = move.domino;
         const direction = move.direction;
         if (domino !== null) {
-            this._board = AddDomino(this._board, domino, direction);
+            this._board = AddDominoToBoard(this._board, domino, direction);
             // const addedCoordinate = this._board.AddDomino(domino, direction);
             // const placementRep = this.GetPlacementRep(domino, direction);
-            this.CurrentPlayer.RemoveDomino(domino);
+            this._players.set(
+                this._currentPlayerIndex,
+                RemoveDominoFromHand(
+                    this._players.get(this._currentPlayerIndex),
+                    domino
+                )
+            );
             this._broadcast(GameMessageType.TURN, {
-                seat: this.CurrentPlayer.Index,
+                seat: this._players.get(this._currentPlayerIndex).index,
                 domino,
                 direction
             } as TurnMessagePayload);
 
             this._emitToPlayer(
                 GameMessageType.HAND,
-                this.CurrentPlayer.Hand,
-                this.CurrentPlayer.Id
+                this._players.get(this._currentPlayerIndex).hand,
+                this._players.get(this._currentPlayerIndex).id
             );
 
             const score = ScoreBoard(this._board);
 
             if (score) {
                 this._broadcast(GameMessageType.SCORE, {
-                    seat: this.CurrentPlayer.Index,
+                    seat: this._players.get(this._currentPlayerIndex).index,
                     score
                 } as ScoreMessagePayload);
             }
 
-            this.CurrentPlayer.AddPoints(score);
+            this._players.set(
+                this._currentPlayerIndex,
+                AddPoints(this._players.get(this._currentPlayerIndex), score)
+            );
             this._nPasses = 0;
         } else {
             // Player passes
             this._nPasses += 1;
 
             this._broadcast(GameMessageType.TURN, {
-                seat: this.CurrentPlayer.Index,
+                seat: this._players.get(this._currentPlayerIndex).index,
                 domino: null,
                 direction: null
             } as TurnMessagePayload);
@@ -238,7 +260,8 @@ export class Engine {
     public NextTurn() {
         // Update the player to move.
         this._currentPlayerIndex =
-            (this.CurrentPlayer.Index + 1) % this._config.NPlayers;
+            (this._players.get(this._currentPlayerIndex).index + 1) %
+            this._config.NPlayers;
     }
 
     public DrawHands(fresh_round = false) {
@@ -252,12 +275,14 @@ export class Engine {
                 this.VerifyHands(hands, fresh_round, this._config.Check5Doubles)
             ) {
                 for (let i = 0; i < this._config.NPlayers; i++) {
-                    const player = this.getPlayerByIndex(i);
-                    player.AssignHand(hands[i]);
+                    this._players.set(i, {
+                        ...this._players.get(i),
+                        hand: hands[i]
+                    });
                     this._emitToPlayer(
                         GameMessageType.HAND,
-                        player.Hand,
-                        player.Id
+                        this._players.get(i).hand,
+                        this._players.get(i).id
                     );
                 }
                 return;
@@ -302,7 +327,7 @@ export class Engine {
         // Assumes each player's hand is assigned and a double exists among them.
         for (let i = 6; i >= 0; i--) {
             for (let p = 0; p < this._config.NPlayers; p++) {
-                for (const domino of this.getPlayerByIndex(p).Hand) {
+                for (const domino of this._players.get(p).hand) {
                     if (domino.head === i && domino.tail === i) {
                         return p;
                     }
@@ -313,7 +338,11 @@ export class Engine {
     }
 
     public PlayersHaveDominoes() {
-        return Math.min(...this._players.map((p) => p.Hand.length)) > 0;
+        return (
+            Math.min(
+                ...Array.from(this._players.values()).map((p) => p.hand.length)
+            ) > 0
+        );
     }
 
     public GameIsOver() {
@@ -321,18 +350,17 @@ export class Engine {
     }
 
     public GetScores(): number[] {
-        return this._players.map((player) => player.Score);
+        return Array.from(this._players.values()).map((player) => player.score);
     }
 
     private async queryMove(
         playerIndex: number,
         play_fresh = false
     ): Promise<{ domino: Domino; direction: Direction }> {
-        const player = this.getPlayerByIndex(playerIndex);
         while (true) {
             const possible_placements = GetValidPlacementsForHand(
                 this._board,
-                player.Hand,
+                this._players.get(this._currentPlayerIndex).hand,
                 play_fresh
             );
             if (this._local) {
@@ -365,15 +393,20 @@ export class Engine {
                     this._emitToPlayer(
                         GameMessageType.POSSIBLE_PLAYS,
                         possiblePlays,
-                        player.Id
+                        this._players.get(this._currentPlayerIndex).id
                     );
                     const response: { domino: number; direction: string } =
                         await this._queryPlayer(
                             QueryType.MOVE,
-                            `${player.Name}, make a move`,
-                            player.Id,
+                            `${
+                                this._players.get(this._currentPlayerIndex).name
+                            }, make a move`,
+                            this._players.get(this._currentPlayerIndex).id,
                             possiblePlays.plays,
-                            this.getGameStateForPlayer(player.Index)
+                            this.getGameStateForPlayer(
+                                this._players.get(this._currentPlayerIndex)
+                                    .index
+                            )
                         );
                     if (response === null) {
                         // Temporary case for disconnects
@@ -392,7 +425,7 @@ export class Engine {
                         this._emitToPlayer(
                             GameMessageType.ERROR,
                             "Invalid domino choice: " + dominoIndex.toString(),
-                            player.Id
+                            this._players.get(this._currentPlayerIndex).id
                         );
                         continue;
                     }
@@ -411,7 +444,7 @@ export class Engine {
                                 GameMessageType.ERROR,
                                 "Invalid domino choice: " +
                                     dominoIndex.toString(),
-                                player.Id
+                                this._players.get(this._currentPlayerIndex).id
                             );
                             continue;
                         }
@@ -426,7 +459,7 @@ export class Engine {
                     this._emitToPlayer(
                         GameMessageType.ERROR,
                         "Invalid input, try again",
-                        player.Id
+                        this._players.get(this._currentPlayerIndex).id
                     );
                 }
             } else {
@@ -434,13 +467,19 @@ export class Engine {
 
                 if (pulled !== null) {
                     this._broadcast(GameMessageType.PULL, {
-                        seat: this.CurrentPlayer.Index
+                        seat: this._players.get(this._currentPlayerIndex).index
                     } as PullMessagePayload);
-                    player.AddDomino(pulled[0]);
+                    this._players.set(
+                        this._players.get(this._currentPlayerIndex).index,
+                        AddDominoToHand(
+                            this._players.get(this._currentPlayerIndex),
+                            pulled[0]
+                        )
+                    );
                     this._emitToPlayer(
                         GameMessageType.HAND,
-                        player.Hand,
-                        player.Id
+                        this._players.get(this._currentPlayerIndex).hand,
+                        this._players.get(this._currentPlayerIndex).id
                     );
                 } else {
                     return { domino: null, direction: null };
@@ -452,9 +491,9 @@ export class Engine {
     public GetValueOnDomino(playerIndex: number) {
         // Get the value of a 'Domino' by a player, i.e. the sum, rounded to the
         // nearest 5, of the other players' hand totals.
-        let total = this._players
-            .filter((player) => player.Index !== playerIndex)
-            .map((p) => p.HandTotal)
+        let total = Array.from(this._players.values())
+            .filter((player) => player.index !== playerIndex)
+            .map((player) => HandTotal(player))
             .reduce((a, b) => a + b, 0);
 
         if (total % 5 > 2) {
@@ -468,14 +507,16 @@ export class Engine {
     public GetBlockedResult(): { player: Player; total: number } {
         // Find the player (if any) that wins points when the game is blocked and return
         // that player and the points they receive.
-        const totals = this._players.map((p) => p.HandTotal);
+        const totals = Array.from(this._players.values()).map((p) =>
+            HandTotal(p)
+        );
         if (totals.filter((t) => t === Math.min(...totals)).length > 1) {
             // Multiple players have lowest count, so nobody gets points
             return { player: null, total: 0 };
         } else {
             // Find the player with minimum score and the sum of the other players' hands, rounded to the nearest 5
-            const scorer = this._players.find(
-                (player) => player.HandTotal === Math.min(...totals)
+            const scorer = Array.from(this._players.values()).find(
+                (player) => HandTotal(player) === Math.min(...totals)
             );
             let total = totals.reduce((a, b) => a + b, 0) - Math.min(...totals);
             if (total % 5 > 2) {
@@ -537,19 +578,11 @@ export class Engine {
     //     };
     // }
 
-    public get Players(): Player[] {
-        return this._players;
-    }
-
-    public get CurrentPlayer(): Player {
-        return this.getPlayerByIndex(this._currentPlayerIndex);
-    }
-
     private getPlayerDescriptionOfSelf(seat: number, player: Player) {
         return {
             seatNumber: seat,
-            score: player.Score,
-            hand: player.Hand.map((domino) => ({
+            score: player.score,
+            hand: player.hand.map((domino) => ({
                 head: domino.head,
                 tail: domino.tail
             }))
@@ -559,14 +592,18 @@ export class Engine {
     private getPlayerDescriptionOfOpponent(seat: number, opponent: Player) {
         return {
             seatNumber: seat,
-            score: opponent.Score,
-            dominoesInHand: opponent.Hand.length
+            score: opponent.score,
+            dominoesInHand: opponent.hand.length
         };
     }
 
     private getPlayerRepresentations(seat: number) {
-        const me = this._players.find((p) => p.Index === seat);
-        const opponents = this._players.filter((p) => p.Index !== seat);
+        const me = Array.from(this._players.values()).find(
+            (p) => p.index === seat
+        );
+        const opponents = Array.from(this._players.values()).filter(
+            (p) => p.index !== seat
+        );
         return {
             me: this.getPlayerDescriptionOfSelf(seat, me),
             opponents: opponents.map((opponent) =>

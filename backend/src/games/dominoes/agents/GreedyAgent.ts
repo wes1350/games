@@ -1,5 +1,5 @@
 import _ from "lodash";
-import { AddDomino } from "../BoardController";
+import { AddDominoToBoard } from "../BoardController";
 import { ScoreBoard } from "../BoardViewModel";
 import { Direction } from "../enums/Direction";
 import { GameEventType } from "../enums/GameEventType";
@@ -24,7 +24,7 @@ const GreedyAgent: Agent = {
     ): Promise<number> => {
         const bestOption = _.maxBy(options, (option) =>
             ScoreBoard(
-                AddDomino(
+                AddDominoToBoard(
                     gameState.board,
                     gameState.players.me.hand[option.domino],
                     option.direction
@@ -35,7 +35,7 @@ const GreedyAgent: Agent = {
             `highest scoring option is ${options.findIndex(
                 (option) => option === bestOption
             )} with a score of ${ScoreBoard(
-                AddDomino(
+                AddDominoToBoard(
                     gameState.board,
                     gameState.players.me.hand[bestOption.domino],
                     bestOption.direction
