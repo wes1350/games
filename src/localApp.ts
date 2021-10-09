@@ -1,25 +1,25 @@
 import * as readline from "readline";
 import _ from "lodash";
 import { Agent } from "@games-common/src/games/dominoes/agents/Agent";
-// import GreedyAgent from "@games-common/src/games/dominoes/agents/GreedyAgent";
+import RandomAgent from "@games-common/src/games/dominoes/agents/RandomAgent";
+import GreedyAgent from "@games-common/src/games/dominoes/agents/GreedyAgent";
 import { GameMessageType } from "@games-common/src/games/dominoes/enums/GameMessageType";
-// import RandomAgent from "@games-common/src/games/dominoes/agents/RandomAgent";
 import { GameType } from "@games-common/src/enums/GameType";
 import { MaskedGameState } from "@games-common/src/games/dominoes/interfaces/GameState";
 import { Direction } from "@games-common/src/games/dominoes/enums/Direction";
-import { Engine as DominoesEngine } from "games-common/src/games/dominoes/Engine";
+import { Engine as DominoesEngine } from "@games-common/src/games/dominoes/Engine";
 
 // Run the game locally on the command line
 
 const playerMap = {
-    Human: null as Agent
-    // RandomAgent: RandomAgent
+    Human: null as Agent,
+    RandomAgent: RandomAgent,
+    GreedyAgent: GreedyAgent
 };
 
 const N_Humans = 1;
 // const agents = [RandomAgent];
-// const agents = [GreedyAgent];
-const agents: Agent[] = [];
+const agents = [GreedyAgent];
 // const agents: Agent[] = [];
 let players: Agent[] = _.flatten([
     _.range(N_Humans).map((i) => playerMap["Human"]),

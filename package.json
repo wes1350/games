@@ -2,7 +2,7 @@
     "name": "@wes1350/games-backend",
     "version": "1.0.0",
     "description": "backend for games project",
-    "main": "src/index.ts",
+    "main": "src/app.ts",
     "dependencies": {
         "connect-redis": "^6.0.0",
         "express": "^4.17.1",

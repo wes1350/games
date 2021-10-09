@@ -1,0 +1,3 @@
+[submodule "games-common"]
+	path = games-common
+	url = https://github.com/wes1350/games-common.git
