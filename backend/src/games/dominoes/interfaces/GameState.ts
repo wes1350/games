@@ -12,9 +12,10 @@ export interface GameState {
     }[];
     pack: Pack;
     board: Board;
+    nPasses: number;
 }
 
-export interface PlayerGameStateView {
+export interface MaskedGameState {
     config: any; //GameConfigDescription; // Need to figure out imports with common, etc.
     myIndex: number;
     currentPlayerIndex: number;
@@ -26,4 +27,5 @@ export interface PlayerGameStateView {
     }[];
     packSize: number;
     board: Board;
+    nPasses: number;
 }

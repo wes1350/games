@@ -4,7 +4,7 @@ import { Agent } from "./games/dominoes/agents/Agent";
 import RandomAgent from "./games/dominoes/agents/RandomAgent";
 import GreedyAgent from "./games/dominoes/agents/GreedyAgent";
 import { Direction } from "./games/dominoes/enums/Direction";
-import { PlayerGameStateView } from "./games/dominoes/interfaces/GameState";
+import { MaskedGameState } from "./games/dominoes/interfaces/GameState";
 import { GameMessageType } from "./games/dominoes/enums/GameMessageType";
 import { Engine as DominoesEngine } from "./games/dominoes/Engine";
 import { GameType } from "./common/enums/GameType";
@@ -41,7 +41,7 @@ const queryPlayer = async (
     message: string,
     playerId: string,
     options: { domino: number; direction: Direction }[],
-    gameState: PlayerGameStateView
+    gameState: MaskedGameState
 ): Promise<any> => {
     // locally, you must respond in the format 'dominoIndex direction', e.g. '3 W'
     // if there is only one possible direction, you can skip specifying the direction

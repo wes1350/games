@@ -5,20 +5,20 @@ import { Direction } from "../enums/Direction";
 import { GameEventType } from "../enums/GameEventType";
 import { QueryType } from "../enums/QueryType";
 import { GameStateUtils } from "../GameStateUtils";
-import { PlayerGameStateView } from "../interfaces/GameState";
+import { MaskedGameState } from "../interfaces/GameState";
 import { Agent } from "./Agent";
 
 const GreedyAgent: Agent = {
     process: (
         eventType: GameEventType,
-        gameState: PlayerGameStateView,
+        gameState: MaskedGameState,
         internalState: any
     ) => {
         return null;
     },
     respond: async (
         queryType: QueryType,
-        gameState: PlayerGameStateView,
+        gameState: MaskedGameState,
         internalState: any,
         options: { domino: number; direction: Direction }[]
     ): Promise<number> => {

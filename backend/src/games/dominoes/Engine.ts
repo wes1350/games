@@ -1,12 +1,11 @@
 import { Board } from "./interfaces/Board";
 import { Config } from "./Config";
-// import { Pack } from "./Pack";
 import * as _ from "lodash";
 import { GameMessageType } from "./enums/GameMessageType";
 import { QueryType } from "./enums/QueryType";
 import { Direction } from "./enums/Direction";
 import { PossiblePlaysMessage } from "./interfaces/PossiblePlaysMessage";
-import { PlayerGameStateView } from "./interfaces/GameState";
+import { MaskedGameState } from "./interfaces/GameState";
 import { GameConfigMessage } from "./interfaces/GameConfigMessage";
 import { PlayerDetails } from "../../interfaces/PlayerDetails";
 import { Domino } from "./interfaces/Domino";
@@ -46,7 +45,7 @@ export class Engine {
         message: string,
         playerId: string,
         options: any,
-        gameState: PlayerGameStateView
+        gameState: MaskedGameState
     ) => Promise<any>;
     private _local?: boolean;
 
@@ -64,7 +63,7 @@ export class Engine {
             payload: any,
             playerId: string,
             options: any,
-            gameState: PlayerGameStateView
+            gameState: MaskedGameState
         ) => Promise<any> = null,
         local?: boolean
     ) {
@@ -581,7 +580,7 @@ export class Engine {
     //     };
     // }
 
-    private getGameStateForPlayer(playerIndex: number): PlayerGameStateView {
+    private getGameStateForPlayer(playerIndex: number): MaskedGameState {
         return {
             config: this._config.ConfigDescription,
             myIndex: playerIndex,
@@ -593,7 +592,8 @@ export class Engine {
                 score: player.score,
                 hand: player.index === playerIndex ? player.hand : null,
                 handSize: player.hand.length
-            }))
+            })),
+            nPasses: this._nPasses
         };
     }
 }
