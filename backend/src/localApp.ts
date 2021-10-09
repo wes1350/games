@@ -1,13 +1,13 @@
 import * as readline from "readline";
 import _ from "lodash";
-import { Agent } from "./games/dominoes/agents/Agent";
-import RandomAgent from "./games/dominoes/agents/RandomAgent";
-import GreedyAgent from "./games/dominoes/agents/GreedyAgent";
-import { Direction } from "./games/dominoes/enums/Direction";
-import { MaskedGameState } from "./games/dominoes/interfaces/GameState";
-import { GameMessageType } from "./games/dominoes/enums/GameMessageType";
-import { Engine as DominoesEngine } from "./games/dominoes/Engine";
-import { GameType } from "./common/enums/GameType";
+import { Agent } from "games-common/src/games/dominoes/agents/Agent";
+import GreedyAgent from "games-common/src/games/dominoes/agents/GreedyAgent";
+import { GameMessageType } from "games-common/src/games/dominoes/enums/GameMessageType";
+import RandomAgent from "games-common/src/games/dominoes/agents/RandomAgent";
+import { GameType } from "games-common/src/enums/GameType";
+import { MaskedGameState } from "games-common/src/games/dominoes/interfaces/GameState";
+import { Direction } from "games-common/src/games/dominoes/enums/Direction";
+import { Engine as DominoesEngine } from "games-common/src/games/dominoes/Engine";
 
 // Run the game locally on the command line
 

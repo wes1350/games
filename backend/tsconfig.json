@@ -72,6 +72,6 @@
         "forceConsistentCasingInFileNames": true /* Disallow inconsistently-cased references to the same file. */
     },
     "extends": "@tsconfig/node14/tsconfig.json",
-    "include": ["@wes1350/games-common/**/*", "src/**/*", "test/**/*"]
+    "include": ["games-common/**/*", "src/**/*", "test/**/*"]
     // "include": ["../common/**/*", "src/**/*", "test/**/*"]
 }

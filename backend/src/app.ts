@@ -8,9 +8,12 @@ import { Room } from "./Room";
 import redis from "redis";
 import session, { SessionOptions } from "express-session";
 import connectRedis from "connect-redis";
-import { RoomMessageType } from "./common/enums/RoomMessageType";
-import { getRandomInt } from "./common/utils";
-import { GameMessageType } from "./games/dominoes/enums/GameMessageType";
+import { RoomMessageType } from "games-common/src/enums/RoomMessageType";
+import { GameMessageType } from "games-common/src/games/dominoes/enums/GameMessageType";
+import _ from "lodash";
+// import { RoomMessageType } from "./common/enums/RoomMessageType";
+// import { getRandomInt } from "./common/utils";
+// import { GameMessageType } from "./games/dominoes/enums/GameMessageType";
 // import { MessageType } from "@common/interfaces/MessageType";
 // import { MessageType } from "@wes1350/games-common/enums/MessageType";
 // import { getRandomInt } from "@wes1350/games-common/utils";
@@ -266,7 +269,7 @@ app.post(
         console.log("got a request to /createRoom");
         const roomIds = Array.from(roomIdsToRooms.keys());
         while (true) {
-            const roomId = getRandomInt(0, 100000000).toString();
+            const roomId = _.random(0, 100000000).toString();
             if (!roomIds.includes(roomId)) {
                 roomIdsToRooms.set(roomId, new Room(roomId, io));
                 res.send(roomId);
@@ -280,3 +283,6 @@ const port = 3001;
 server.listen(port, () => {
     console.log(`listening on *:${port}`);
 });
+function getRandomInt(arg0: number, arg1: number) {
+    throw new Error("Function not implemented.");
+}
