@@ -1,3 +1,0 @@
-[submodule "backend/games-common"]
-	path = backend/games-common
-	url = https://github.com/wes1350/games-common.git
