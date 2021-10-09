@@ -5,20 +5,20 @@ import { Direction } from "../enums/Direction";
 import { GameEventType } from "../enums/GameEventType";
 import { QueryType } from "../enums/QueryType";
 import { GameStateUtils } from "../GameStateUtils";
-import { GameState } from "../interfaces/GameState";
+import { PlayerGameStateView } from "../interfaces/GameState";
 import { Agent } from "./Agent";
 
 const GreedyAgent: Agent = {
     process: (
         eventType: GameEventType,
-        gameState: GameState,
+        gameState: PlayerGameStateView,
         internalState: any
     ) => {
         return null;
     },
     respond: async (
         queryType: QueryType,
-        gameState: GameState,
+        gameState: PlayerGameStateView,
         internalState: any,
         options: { domino: number; direction: Direction }[]
     ): Promise<number> => {
@@ -26,7 +26,7 @@ const GreedyAgent: Agent = {
             ScoreBoard(
                 AddDominoToBoard(
                     gameState.board,
-                    gameState.players.me.hand[option.domino],
+                    gameState.players[gameState.myIndex].hand[option.domino],
                     option.direction
                 )
             )
@@ -37,7 +37,9 @@ const GreedyAgent: Agent = {
             )} with a score of ${ScoreBoard(
                 AddDominoToBoard(
                     gameState.board,
-                    gameState.players.me.hand[bestOption.domino],
+                    gameState.players[gameState.myIndex].hand[
+                        bestOption.domino
+                    ],
                     bestOption.direction
                 )
             )}`

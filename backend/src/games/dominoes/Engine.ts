@@ -1,12 +1,12 @@
 import { Board } from "./interfaces/Board";
 import { Config } from "./Config";
-import { Pack } from "./Pack";
+// import { Pack } from "./Pack";
 import * as _ from "lodash";
 import { GameMessageType } from "./enums/GameMessageType";
 import { QueryType } from "./enums/QueryType";
 import { Direction } from "./enums/Direction";
 import { PossiblePlaysMessage } from "./interfaces/PossiblePlaysMessage";
-import { GameState } from "./interfaces/GameState";
+import { PlayerGameStateView } from "./interfaces/GameState";
 import { GameConfigMessage } from "./interfaces/GameConfigMessage";
 import { PlayerDetails } from "../../interfaces/PlayerDetails";
 import { Domino } from "./interfaces/Domino";
@@ -26,6 +26,7 @@ import {
     AddPoints,
     RemoveDominoFromHand
 } from "./PlayerController";
+import { InitializePack, Pack, Pull, Size } from "./interfaces/Pack";
 
 export class Engine {
     private _config: Config;
@@ -45,7 +46,7 @@ export class Engine {
         message: string,
         playerId: string,
         options: any,
-        gameState: GameState
+        gameState: PlayerGameStateView
     ) => Promise<any>;
     private _local?: boolean;
 
@@ -63,7 +64,7 @@ export class Engine {
             payload: any,
             playerId: string,
             options: any,
-            gameState: GameState
+            gameState: PlayerGameStateView
         ) => Promise<any> = null,
         local?: boolean
     ) {
@@ -264,10 +265,12 @@ export class Engine {
 
     public DrawHands(fresh_round = false) {
         while (true) {
-            this._pack = new Pack();
+            this._pack = InitializePack();
             const hands = [];
             for (let i = 0; i < this._config.NPlayers; i++) {
-                hands.push(this._pack.Pull(this._config.HandSize));
+                const pullResult = Pull(this._pack, this._config.HandSize);
+                this._pack = pullResult.pack;
+                hands.push(pullResult.pulled);
             }
             if (
                 this.VerifyHands(hands, fresh_round, this._config.Check5Doubles)
@@ -461,7 +464,9 @@ export class Engine {
                     );
                 }
             } else {
-                const pulled = this._pack.Pull();
+                const pullResult = Pull(this._pack);
+                this._pack = pullResult.pack;
+                const pulled = pullResult.pulled;
 
                 if (pulled !== null) {
                     this._broadcast(GameMessageType.PULL, {
@@ -576,46 +581,19 @@ export class Engine {
     //     };
     // }
 
-    private getPlayerDescriptionOfSelf(seat: number, player: Player) {
-        return {
-            seatNumber: seat,
-            score: player.score,
-            hand: player.hand.map((domino) => ({
-                head: domino.head,
-                tail: domino.tail
-            }))
-        };
-    }
-
-    private getPlayerDescriptionOfOpponent(seat: number, opponent: Player) {
-        return {
-            seatNumber: seat,
-            score: opponent.score,
-            dominoesInHand: opponent.hand.length
-        };
-    }
-
-    private getPlayerRepresentations(seat: number) {
-        const me = Array.from(this._players.values()).find(
-            (p) => p.index === seat
-        );
-        const opponents = Array.from(this._players.values()).filter(
-            (p) => p.index !== seat
-        );
-        return {
-            me: this.getPlayerDescriptionOfSelf(seat, me),
-            opponents: opponents.map((opponent) =>
-                this.getPlayerDescriptionOfOpponent(seat, opponent)
-            )
-        };
-    }
-
-    private getGameStateForPlayer(playerIndex: number): GameState {
+    private getGameStateForPlayer(playerIndex: number): PlayerGameStateView {
         return {
             config: this._config.ConfigDescription,
-            seatNumberForTurn: this._currentPlayerIndex, // maybe need to go back one player for event notification, depending on call order
+            myIndex: playerIndex,
+            currentPlayerIndex: this._currentPlayerIndex, // maybe need to go back one player for event notification, depending on call order
             board: this._board,
-            players: this.getPlayerRepresentations(playerIndex)
+            packSize: Size(this._pack),
+            players: Array.from(this._players.values()).map((player) => ({
+                index: player.index,
+                score: player.score,
+                hand: player.index === playerIndex ? player.hand : null,
+                handSize: player.hand.length
+            }))
         };
     }
 }
