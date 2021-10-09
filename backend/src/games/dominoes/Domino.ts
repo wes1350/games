@@ -1,4 +1,7 @@
-import { Domino } from "./interfaces/Domino";
+export interface Domino {
+    head: number;
+    tail: number;
+}
 
 export const IsDouble = (domino: Domino): boolean => {
     return domino.head === domino.tail;
@@ -36,4 +39,8 @@ export const DominoTextRep = (domino: Domino): string => {
 // Used for dominoes in the south and west arms, since the head points towards the center
 export const ReversedDominoTextRep = (domino: Domino): string => {
     return `[${domino.tail},${domino.head}]`;
+};
+
+export const Reversed = (domino: Domino): Domino => {
+    return { head: domino.tail, tail: domino.head };
 };

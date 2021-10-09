@@ -1,4 +1,11 @@
-import { Board } from "./interfaces/Board";
+import {
+    AddDominoToBoard,
+    Board,
+    BoardTextRep,
+    GetValidPlacementsForHand,
+    InitializeBoard,
+    ScoreBoard
+} from "./Board";
 import { Config } from "./Config";
 import * as _ from "lodash";
 import { GameMessageType } from "./enums/GameMessageType";
@@ -8,24 +15,20 @@ import { PossiblePlaysMessage } from "./interfaces/PossiblePlaysMessage";
 import { MaskedGameState } from "./interfaces/GameState";
 import { GameConfigMessage } from "./interfaces/GameConfigMessage";
 import { PlayerDetails } from "../../interfaces/PlayerDetails";
-import { Domino } from "./interfaces/Domino";
-import { AddDominoToBoard } from "./BoardController";
-import { ScoreBoard, BoardTextRep } from "./BoardViewModel";
-import { DominoTextRep, IsDouble } from "./DominoViewModel";
-import { GetValidPlacementsForHand, InitializeBoard } from "./BoardUtils";
+import { Domino, DominoTextRep, IsDouble } from "./Domino";
 import { NewRoundMessagePayload } from "./interfaces/NewRoundMessagePayload";
 import { ScoreMessagePayload } from "./interfaces/ScoreMessagePayload";
 import { TurnMessagePayload } from "./interfaces/TurnMessagePayload";
 import { PullMessagePayload } from "./interfaces/PullMessagePayload";
-import { Player } from "./interfaces/Player";
-import { InitializePlayer } from "./PlayerUtils";
-import { HandTotal } from "./PlayerViewModel";
 import {
     AddDominoToHand,
     AddPoints,
+    HandTotal,
+    InitializePlayer,
+    Player,
     RemoveDominoFromHand
-} from "./PlayerController";
-import { InitializePack, Pack, Pull, Size } from "./interfaces/Pack";
+} from "./Player";
+import { InitializePack, Pack, Pull, Size } from "./Pack";
 
 export class Engine {
     private _config: Config;
@@ -189,7 +192,7 @@ export class Engine {
     }
 
     public async PlayTurn(play_fresh = false) {
-        const move = await this.queryMove(this._currentPlayerIndex, play_fresh);
+        const move = await this.queryMove(play_fresh);
         if (move === null) {
             // Temporary case for disconnects
             return null;
@@ -354,7 +357,6 @@ export class Engine {
     }
 
     private async queryMove(
-        playerIndex: number,
         play_fresh = false
     ): Promise<{ domino: Domino; direction: Direction }> {
         while (true) {
@@ -467,7 +469,7 @@ export class Engine {
                 this._pack = pullResult.pack;
                 const pulled = pullResult.pulled;
 
-                if (pulled !== null) {
+                if (pulled.length > 0) {
                     this._broadcast(GameMessageType.PULL, {
                         seat: this._currentPlayerIndex
                     } as PullMessagePayload);

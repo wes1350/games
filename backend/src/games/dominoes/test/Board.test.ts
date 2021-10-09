@@ -1,7 +1,10 @@
 import { expect } from "chai";
-import { AddDominoToBoard } from "../BoardController";
-import { InitializeBoard, VerifyPlacement } from "../BoardUtils";
-import { ScoreBoard } from "../BoardViewModel";
+import {
+    AddDominoToBoard,
+    InitializeBoard,
+    ScoreBoard,
+    VerifyPlacement
+} from "../Board";
 import { Direction } from "../enums/Direction";
 
 describe("Board test", () => {

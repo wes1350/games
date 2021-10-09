@@ -1,10 +1,8 @@
 import _ from "lodash";
-import { AddDominoToBoard } from "../BoardController";
-import { ScoreBoard } from "../BoardViewModel";
+import { AddDominoToBoard, ScoreBoard } from "../Board";
 import { Direction } from "../enums/Direction";
 import { GameEventType } from "../enums/GameEventType";
 import { QueryType } from "../enums/QueryType";
-import { GameStateUtils } from "../GameStateUtils";
 import { MaskedGameState } from "../interfaces/GameState";
 import { Agent } from "./Agent";
 

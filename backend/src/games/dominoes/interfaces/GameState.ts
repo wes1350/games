@@ -1,6 +1,6 @@
-import { Board } from "./Board";
-import { Domino } from "./Domino";
-import { Pack } from "./Pack";
+import { Board } from "../Board";
+import { Domino } from "../Domino";
+import { Pack } from "../Pack";
 
 export interface GameState {
     config: any; //GameConfigDescription; // Need to figure out imports with common, etc.
