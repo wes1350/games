@@ -2,7 +2,7 @@
     "name": "@wes1350/games-backend",
     "version": "1.0.0",
     "description": "backend for games project",
-    "main": "src/app.ts",
+    "main": "",
     "dependencies": {
         "connect-redis": "^6.0.0",
         "express": "^4.17.1",
@@ -33,11 +33,12 @@
         "prettier": "^2.3.2",
         "ts-mocha": "^8.0.0",
         "ts-node": "^10.1.0",
+        "tsconfig-paths": "^3.11.0",
         "typescript": "^4.3.5"
     },
     "scripts": {
-        "start": "nodemon --exec node -r ts-node/register src/app.ts",
-        "startlocal": "nodemon --exec node -r ts-node/register src/localApp.ts",
+        "start": "nodemon --exec node -r ts-node/register -r tsconfig-paths/register src/app.ts",
+        "startlocal": "nodemon --exec node -r ts-node/register -r tsconfig-paths/register src/localApp.ts",
         "test": "ts-mocha --paths src/**/*.test.ts",
         "lint": "eslint . --ext .ts"
     },
