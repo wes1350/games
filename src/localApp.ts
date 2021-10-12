@@ -55,6 +55,10 @@ const queryPlayer = async (
             };
         });
     } else {
+        const defaultResponse = {
+            domino: options[0].domino,
+            direction: options[0].direction
+        };
         console.log("querying agent");
         // console.log("gameState:", JSON.stringify(gameState, null, 4));
         if (options.length === 0) {
@@ -62,25 +66,32 @@ const queryPlayer = async (
                 "Tried to query an agent when no options were given"
             );
         } else if (options.length === 1) {
-            return {
-                domino: options[0].domino,
-                direction: options[0].direction
-            };
+            return defaultResponse;
         }
 
         console.log("going to ask agent");
-
-        // For now, send a blank game state. We need to add this later
-        const response = await player.respond(type, gameState, player, options);
-        console.log("response:", response);
         try {
+            // For now, send a blank game state. We need to add this later
+            const response = await player.respond(
+                type,
+                gameState,
+                player,
+                options
+            );
+            console.log("response:", response);
             return {
                 domino: options[response].domino,
                 direction: options[response].direction
             };
         } catch (err) {
             console.error(err);
-            console.warn("Agent returned an invalid response:", response);
+            console.warn(
+                "Agent returned an invalid response.",
+                "gameState:",
+                gameState,
+                "options:",
+                options
+            );
             return {
                 domino: options[0].domino,
                 direction: options[0].direction
