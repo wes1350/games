@@ -1,7 +1,7 @@
 // import { GameConfigMessage } from "@common/interfaces/GameConfigDescriptionMessage";
 // import { MessageType } from "@common/interfaces/MessageType";
-import { PlayerDetails } from "@games-common/src/interfaces/PlayerDetails";
 // import { sleep } from "@games-common/src/utils";
+import { PlayerDetails } from "@games-common/interfaces/PlayerDetails";
 import { Socket } from "socket.io";
 // import { sleep } from "./common/utils";
 // import { Engine } from "./Engine";

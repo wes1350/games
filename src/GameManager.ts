@@ -1,8 +1,8 @@
 // import { GameType } from "@games-common/src/enums/GameType";
-import { GameType } from "@games-common/src/enums/GameType";
-import { Engine } from "@games-common/src/games/dominoes/Engine";
-import { GameConfigMessage as DominoesGameConfigMessage } from "@games-common/src/games/dominoes/interfaces/GameConfigMessage";
-import { PlayerDetails } from "@games-common/src/interfaces/PlayerDetails";
+import { GameType } from "@games-common/enums/GameType";
+import { Config } from "@games-common/games/dominoes/Config";
+import { Engine } from "@games-common/games/dominoes/Engine";
+import { PlayerDetails } from "@games-common/interfaces/PlayerDetails";
 import _ from "lodash";
 // import { GameType } from "./common/enums/GameType";
 // import { Engine as DominoesEngine } from "./games/dominoes/Engine";
@@ -20,7 +20,7 @@ export class GameManager {
         const gameType = gameConfig.gameType;
 
         if (gameType === GameType.DOMINOES) {
-            const config = gameConfig as DominoesGameConfigMessage;
+            const config = gameConfig as Config;
             const engine = new Engine(
                 config,
                 playerDetails,

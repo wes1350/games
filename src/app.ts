@@ -217,7 +217,7 @@ app.get(
         if (req.session.playerName) {
             res.send({ name: req.session.playerName });
         } else {
-            const guestName = `Guest-${getRandomInt(1, 1000000)}`;
+            const guestName = `Guest-${_.random(0, 10000000)}`;
             req.session.playerName = guestName;
             res.send({ name: guestName });
         }
@@ -283,6 +283,3 @@ const port = 3001;
 server.listen(port, () => {
     console.log(`listening on *:${port}`);
 });
-function getRandomInt(arg0: number, arg1: number) {
-    throw new Error("Function not implemented.");
-}
