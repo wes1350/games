@@ -136,7 +136,7 @@ export class Room {
 
     private broadcast(type: any, payload: any) {
         console.log(
-            `broadcasting ${
+            `\nbroadcasting ${
                 typeof payload === "object" ? JSON.stringify(payload) : payload
             } of type ${type} to room ${this.id}`
         );
@@ -145,7 +145,7 @@ export class Room {
 
     private emitToPlayer = (type: any, payload: any, playerId: string) => {
         console.log(
-            `emitting ${
+            `\nemitting ${
                 typeof payload === "object" ? JSON.stringify(payload) : payload
             } of type ${type} to player ${playerId}`
         );
