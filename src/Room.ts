@@ -1,3 +1,4 @@
+import { GameConfig } from "@games-common/interfaces/GameConfig";
 import { PlayerDetails } from "@games-common/interfaces/PlayerDetails";
 import { Socket } from "socket.io";
 import { GameManager } from "./GameManager";
@@ -69,7 +70,7 @@ export class Room {
         this.socketIdsToNames.delete(socketId);
     }
 
-    public StartGame(config: any): void {
+    public StartGame(config: GameConfig): void {
         console.log("config:", config);
         this.socketIds.forEach((socketId: string) => {
             // this.playersToSocketIds.set(i, socketId);
@@ -143,11 +144,11 @@ export class Room {
     }
 
     private emitToPlayer = (type: any, payload: any, playerId: string) => {
-        // console.log(
-        //     `emitting ${
-        //         typeof payload === "object" ? JSON.stringify(payload) : payload
-        //     } of type ${type} to player ${playerId}`
-        // );
+        console.log(
+            `emitting ${
+                typeof payload === "object" ? JSON.stringify(payload) : payload
+            } of type ${type} to player ${playerId}`
+        );
         this.getSocketFromId(playerId).emit(type as string, payload);
     };
 
