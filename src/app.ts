@@ -132,6 +132,8 @@ io.on("connection", (socket: Socket) => {
         // TODO: add type for config
         (roomId: string, config: any) => {
             console.log(`starting game for room ${roomId}`);
+            // TODO: When restarting the frontend, they may load into an invalid room
+            // Trying to start the game can lead to a "cannot read property 'StartGame' of undefined"
             roomIdsToRooms.get(roomId).StartGame(config);
         }
     );
