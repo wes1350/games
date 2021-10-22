@@ -80,7 +80,11 @@ export class Room {
             this.getSocketFromId(socketId).onAny(
                 (eventName: string, response: string) => {
                     console.log(
-                        `received: ${eventName} -- response: ${response}`
+                        `received: ${eventName} -- response: ${
+                            typeof response === "object"
+                                ? JSON.stringify(response)
+                                : response
+                        }`
                     );
                     this.socketIdsToResponses.set(socketId, response);
                 }
