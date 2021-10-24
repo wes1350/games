@@ -58,6 +58,9 @@ export class Room {
     }
 
     private clear = () => {
+        // Problem: we are clearing (since the game is over) before the messages get sent, resulting in the game over message not being received
+        // Might want to rethink the architecture - kicking people out of rooms once the game is over may not be ideal
+        console.log("clearing");
         this.socketIds.forEach((socketId) => {
             this.RemovePlayerBySocketId(socketId);
             this.io.sockets.sockets.get(socketId).leave(this.id);

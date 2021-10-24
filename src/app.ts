@@ -58,8 +58,7 @@ const io = new Server(server, {
         methods: ["GET", "POST"],
         transports: ["websocket", "polling"],
         credentials: true
-    },
-    allowEIO3: true
+    }
 });
 
 // From https://socket.io/docs/v4/middlewares/
@@ -96,7 +95,7 @@ const removeSocketIdFromSession = (sessionId: string, socketId: string) => {
     }
 };
 
-// Move this to Redis later
+// Move this to Redis Adapter later
 const roomIdsToRooms = new Map<string, Room>();
 const socketIdsToRoomIds = new Map<string, string[]>();
 
@@ -104,7 +103,9 @@ io.on("connection", (socket: Socket) => {
     const session = (socket.request as any).session;
     const sessionId = session.id;
 
-    console.log(`a user with session ID ${sessionId} connected`);
+    console.log(
+        `a user with session ID ${sessionId} and socket ID ${socket.id} connected`
+    );
     addSocketIdToSession(sessionId, socket.id);
     socketIdsToRoomIds.set(socket.id, []);
 
