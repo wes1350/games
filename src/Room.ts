@@ -1,5 +1,6 @@
 import { GameConfig } from "@games-common/interfaces/GameConfig";
 import { PlayerDetails } from "@games-common/interfaces/PlayerDetails";
+import { ALPHANUMERIC_NONVOWEL, GenerateId } from "@games-common/utils";
 import { Socket } from "socket.io";
 import { GameManager } from "./GameManager";
 
@@ -7,6 +8,8 @@ export class Room {
     // Eventually, all of this state should be moved into Redis
     private io: any;
     private id: string;
+    private gameRoomId: string;
+    private spectateRoomId: string;
     private socketIdsToNames: Map<string, string>;
 
     constructor(id: string, io: any) {
@@ -48,32 +51,58 @@ export class Room {
 
     public StartGame(config: GameConfig): void {
         console.log("config:", config);
+
+        const randomId = GenerateId(ALPHANUMERIC_NONVOWEL, 16);
+        // TODO: Should clear out previous game/spectator rooms to avoid unused rooms building up
+        // Not immediately though, since people may still want to chat post-game
+        this.gameRoomId = "game_" + randomId;
+        this.spectateRoomId = "spectate_" + randomId;
+
+        this.socketIds.forEach((socketId) => {
+            this.io.sockets.sockets.get(socketId).leave(this.id);
+            // TODO: depending on the participant type (player or spectator), need to join a room
+            this.io.sockets.sockets.get(socketId).join(this.gameRoomId);
+        });
+
         GameManager.RunGame(
             config,
             this.PlayerDetails,
-            this.broadcast.bind(this),
+            this.broadcastToPlayers.bind(this),
             this.emitToPlayer.bind(this),
             this.queryPlayer.bind(this)
-        ).then(() => this.clear());
+        );
+        // ).then(() => this.clear());
     }
 
-    private clear = () => {
-        // Problem: we are clearing (since the game is over) before the messages get sent, resulting in the game over message not being received
-        // Might want to rethink the architecture - kicking people out of rooms once the game is over may not be ideal
-        console.log("clearing");
-        this.socketIds.forEach((socketId) => {
-            this.RemovePlayerBySocketId(socketId);
-            this.io.sockets.sockets.get(socketId).leave(this.id);
-        });
-    };
+    // private clear = () => {
+    //     // Problem: we are clearing (since the game is over) before the messages get sent, resulting in the game over message not being received
+    //     // Might want to rethink the architecture - kicking people out of rooms once the game is over may not be ideal
+    //     console.log("clearing");
+    //     this.socketIds.forEach((socketId) => {
+    //         // this.RemovePlayerBySocketId(socketId);
+    //         this.socketIdsToNames.delete(socketId);
+    //         this.io.sockets.sockets.get(socketId).leave(this.id);
+    //     });
+    // };
 
-    private broadcast(type: any, payload: any) {
+    private broadcastToPlayers(type: any, payload: any) {
         console.log(
             `\nbroadcasting ${
                 typeof payload === "object" ? JSON.stringify(payload) : payload
-            } of type ${type} to room ${this.id}`
+            } of type ${type} to players in room ${this.gameRoomId}`
         );
-        this.io.to(this.id).emit(type, payload);
+        this.io.to(this.gameRoomId).emit(type, payload);
+    }
+
+    // Spectating is not yet implemented, but to implement, a "broadcast to spectators" method needs to be added
+    // This will be useful in cases where we emit unique messages to each player in game, but need to broadcast to spectators
+    private broadcastToSpectators(type: any, payload: any) {
+        console.log(
+            `\nbroadcasting ${
+                typeof payload === "object" ? JSON.stringify(payload) : payload
+            } of type ${type} to players in room ${this.spectateRoomId}`
+        );
+        this.io.to(this.spectateRoomId).emit(type, payload);
     }
 
     private emitToPlayer = (type: any, payload: any, playerId: string) => {

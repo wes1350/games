@@ -9,6 +9,11 @@ import connectRedis from "connect-redis";
 import { RoomMessageType } from "games-common/src/enums/RoomMessageType";
 import { GameMessageType } from "games-common/src/games/dominoes/enums/GameMessageType";
 import _ from "lodash";
+import {
+    ALPHANUMERIC_NONVOWEL,
+    GenerateId,
+    HEX_CHARSET
+} from "@games-common/utils";
 
 declare module "express-session" {
     interface SessionData {
@@ -68,33 +73,6 @@ const wrap =
 
 io.use(wrap(sessionMiddleware));
 
-// Is this necessary? Maybe store in the session as a property
-// Map each session ID to all connected socket IDs (e.g. if there are multiple tabs)
-const sessionIdsToSocketIds = new Map<string, string[]>();
-
-const addSocketIdToSession = (sessionId: string, socketId: string) => {
-    if (!sessionIdsToSocketIds.has(sessionId)) {
-        sessionIdsToSocketIds.set(sessionId, [socketId]);
-    } else {
-        sessionIdsToSocketIds.get(sessionId).push(socketId);
-    }
-};
-
-const removeSocketIdFromSession = (sessionId: string, socketId: string) => {
-    if (sessionIdsToSocketIds.has(sessionId)) {
-        if (sessionIdsToSocketIds.get(sessionId).length === 1) {
-            sessionIdsToSocketIds.delete(sessionId);
-        } else {
-            sessionIdsToSocketIds.set(
-                sessionId,
-                sessionIdsToSocketIds
-                    .get(sessionId)
-                    .filter((id) => id !== socketId)
-            );
-        }
-    }
-};
-
 // Move this to Redis Adapter later
 const roomIdsToRooms = new Map<string, Room>();
 const socketIdsToRoomIds = new Map<string, string[]>();
@@ -106,12 +84,10 @@ io.on("connection", (socket: Socket) => {
     console.log(
         `a user with session ID ${sessionId} and socket ID ${socket.id} connected`
     );
-    addSocketIdToSession(sessionId, socket.id);
     socketIdsToRoomIds.set(socket.id, []);
 
     socket.on("disconnect", () => {
         console.log(`user with session ID ${sessionId} disconnected`);
-        removeSocketIdFromSession(sessionId, socket.id);
 
         socketIdsToRoomIds.get(socket.id).forEach((roomId) => {
             const room = roomIdsToRooms.get(roomId);
@@ -152,7 +128,7 @@ io.on("connection", (socket: Socket) => {
                 console.log(
                     `user ${session.playerName} joining room ${roomId}`
                 );
-                if (!roomIdsToRooms.get(roomId)) {
+                if (!roomIdsToRooms.has(roomId)) {
                     roomIdsToRooms.set(roomId, new Room(roomId, io));
                 }
                 if (!socketIdsToRoomIds.get(socket.id).includes(roomId)) {
@@ -264,10 +240,11 @@ app.post(
         console.log("got a request to /createRoom");
         const roomIds = Array.from(roomIdsToRooms.keys());
         while (true) {
-            const roomId = _.random(0, 100000000).toString();
+            const roomId = GenerateId(ALPHANUMERIC_NONVOWEL, 4);
             if (!roomIds.includes(roomId)) {
                 roomIdsToRooms.set(roomId, new Room(roomId, io));
-                res.send(roomId);
+
+                res.json({ id: roomId });
                 break;
             }
         }
