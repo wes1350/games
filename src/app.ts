@@ -8,9 +8,10 @@ import session, { SessionOptions } from "express-session";
 import connectRedis from "connect-redis";
 import { RoomMessageType } from "games-common/src/enums/RoomMessageType";
 import { GameMessageType } from "games-common/src/games/dominoes/enums/GameMessageType";
-import _ from "lodash";
+import _, { identity } from "lodash";
 import { ALPHANUMERIC_NONVOWEL, GenerateId } from "@games-common/utils";
 import { GameConfig } from "@games-common/interfaces/GameConfig";
+import { RoomVisibility } from "./enums/RoomVisibility";
 
 declare module "express-session" {
     interface SessionData {
@@ -136,7 +137,7 @@ io.on("connection", (socket: Socket) => {
                 room.AddPlayerToLobby(socket.id, session.playerName);
                 io.to(roomId).emit(
                     RoomMessageType.ROOM_DETAILS,
-                    room.LobbyMemberDetails
+                    room.RoomDetails
                 );
                 // Replace with user ID or something similar
                 socket
@@ -163,10 +164,7 @@ io.on("connection", (socket: Socket) => {
         );
         // Replace with user ID or something similar
         if (room?.NPlayers > 0) {
-            io.to(roomId).emit(
-                RoomMessageType.ROOM_DETAILS,
-                room.LobbyMemberDetails
-            );
+            io.to(roomId).emit(RoomMessageType.ROOM_DETAILS, room.RoomDetails);
             socket.to(roomId).emit(RoomMessageType.PLAYER_LEFT_ROOM, "user");
         } else {
             roomIdsToRooms.delete(roomId);
@@ -217,12 +215,16 @@ app.get(
         res: express.Response,
         next: express.NextFunction
     ) => {
-        const roomIds = Array.from(roomIdsToRooms.keys());
-        const roomDetails = roomIds.map((roomId) => ({
-            id: roomId,
-            nPlayers: roomIdsToRooms.get(roomId).NPlayers
-        }));
-        res.json({ rooms: roomDetails });
+        const publicRooms = [...roomIdsToRooms].filter(
+            ([_id, room]) => room.Visibility === RoomVisibility.PUBLIC
+        );
+
+        res.json({
+            rooms: publicRooms.map(([id, room]) => ({
+                id,
+                nPlayers: room.NPlayers
+            }))
+        });
     }
 );
 
@@ -243,6 +245,29 @@ app.post(
                 res.json({ id: roomId });
                 break;
             }
+        }
+    }
+);
+
+app.post(
+    "/setRoomVisibility",
+    (
+        req: express.Request,
+        res: express.Response,
+        next: express.NextFunction
+    ) => {
+        const roomId = req.body.roomId;
+        const isPrivate = req.body.isPrivate;
+
+        const room = roomIdsToRooms.get(roomId);
+        if (room) {
+            room.SetVisibility(
+                isPrivate ? RoomVisibility.PRIVATE : RoomVisibility.PUBLIC
+            );
+            room.BroadcastToLobby(
+                RoomMessageType.ROOM_DETAILS,
+                room.RoomDetails
+            );
         }
     }
 );

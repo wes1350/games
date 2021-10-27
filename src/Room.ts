@@ -1,7 +1,8 @@
 import { GameConfig } from "@games-common/interfaces/GameConfig";
-import { PlayerDetails } from "@games-common/interfaces/PlayerDetails";
+import { RoomDetails } from "@games-common/interfaces/RoomDetails";
 import { ALPHANUMERIC_NONVOWEL, GenerateId } from "@games-common/utils";
 import { Socket } from "socket.io";
+import { RoomVisibility } from "./enums/RoomVisibility";
 import { GameManager } from "./GameManager";
 
 enum MemberType {
@@ -22,6 +23,7 @@ const changeType = (member: Member, type: MemberType) => {
 export class Room {
     // Eventually, all of this state should be moved into Redis
     private io: any;
+    private roomVisibility: RoomVisibility;
     private id: string;
     private gameRoomId: string;
     private spectateRoomId: string;
@@ -31,7 +33,16 @@ export class Room {
     constructor(id: string, io: any) {
         this.io = io;
         this.id = id;
+        this.roomVisibility = RoomVisibility.PUBLIC;
         this.members = new Map();
+    }
+
+    public SetVisibility(value: RoomVisibility): void {
+        this.roomVisibility = value;
+    }
+
+    public get Visibility(): RoomVisibility {
+        return this.roomVisibility;
     }
 
     private get socketIds(): string[] {
@@ -42,8 +53,11 @@ export class Room {
         return this.io.sockets.sockets.get(socketId) as Socket;
     }
 
-    public get LobbyMemberDetails(): PlayerDetails[] {
-        return this.GetMemberDetails(MemberType.LOBBY);
+    public get RoomDetails(): RoomDetails {
+        return {
+            private: this.Visibility === RoomVisibility.PRIVATE,
+            players: this.GetMemberDetails(MemberType.LOBBY)
+        };
     }
 
     private getMembersByType(type: MemberType): Map<string, Member> {
@@ -52,7 +66,7 @@ export class Room {
         );
     }
 
-    public GetMemberDetails(type: MemberType): PlayerDetails[] {
+    public GetMemberDetails(type: MemberType): { id: string; name: string }[] {
         return [...this.getMembersByType(type)].map((entry) => ({
             id: entry[0],
             name: entry[1].name
@@ -135,11 +149,11 @@ export class Room {
         );
     }
 
-    private broadcastToLobby(type: any, payload: any) {
+    public BroadcastToLobby(type: any, payload: any) {
         console.log(
             `\nbroadcasting ${
                 typeof payload === "object" ? JSON.stringify(payload) : payload
-            } of type ${type} to everyone in room lobby ${this.gameRoomId}`
+            } of type ${type} to everyone in room lobby ${this.id}`
         );
         this.io.to(this.id).emit(type, payload);
     }
