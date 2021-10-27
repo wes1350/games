@@ -9,11 +9,8 @@ import connectRedis from "connect-redis";
 import { RoomMessageType } from "games-common/src/enums/RoomMessageType";
 import { GameMessageType } from "games-common/src/games/dominoes/enums/GameMessageType";
 import _ from "lodash";
-import {
-    ALPHANUMERIC_NONVOWEL,
-    GenerateId,
-    HEX_CHARSET
-} from "@games-common/utils";
+import { ALPHANUMERIC_NONVOWEL, GenerateId } from "@games-common/utils";
+import { GameConfig } from "@games-common/interfaces/GameConfig";
 
 declare module "express-session" {
     interface SessionData {
@@ -106,12 +103,13 @@ io.on("connection", (socket: Socket) => {
 
     socket.on(
         GameMessageType.GAME_START,
-        // TODO: add type for config
-        (roomId: string, config: any) => {
-            console.log(`starting game for room ${roomId}`);
-            // TODO: When restarting the frontend, they may load into an invalid room
-            // Trying to start the game can lead to a "cannot read property 'StartGame' of undefined"
-            roomIdsToRooms.get(roomId).StartGame(config);
+        (roomId: string, config: GameConfig) => {
+            if (!roomIdsToRooms.has(roomId)) {
+                console.warn(`Invalid room ${roomId}; cannot start game`);
+            } else {
+                console.log(`starting game for room ${roomId}`);
+                roomIdsToRooms.get(roomId).StartGame(config);
+            }
         }
     );
 
@@ -134,12 +132,11 @@ io.on("connection", (socket: Socket) => {
                 if (!socketIdsToRoomIds.get(socket.id).includes(roomId)) {
                     socketIdsToRoomIds.get(socket.id).push(roomId);
                 }
-                socket.join(roomId);
                 const room = roomIdsToRooms.get(roomId);
-                room.AddPlayer(socket.id, session.playerName);
+                room.AddPlayerToLobby(socket.id, session.playerName);
                 io.to(roomId).emit(
                     RoomMessageType.ROOM_DETAILS,
-                    room.PlayerDetails
+                    room.LobbyMemberDetails
                 );
                 // Replace with user ID or something similar
                 socket
@@ -164,12 +161,11 @@ io.on("connection", (socket: Socket) => {
             socket.id,
             roomIdsForSocket.splice(roomIdIndex, 1)
         );
-        socket.leave(roomId);
         // Replace with user ID or something similar
         if (room?.NPlayers > 0) {
             io.to(roomId).emit(
                 RoomMessageType.ROOM_DETAILS,
-                room.PlayerDetails
+                room.LobbyMemberDetails
             );
             socket.to(roomId).emit(RoomMessageType.PLAYER_LEFT_ROOM, "user");
         } else {
