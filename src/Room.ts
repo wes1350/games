@@ -107,8 +107,8 @@ export class Room {
             this.getSocket(socketId).leave(this.id);
             this.getSocket(socketId).leave(this.gameRoomId);
             this.getSocket(socketId).leave(this.spectateRoomId);
-            this.members.delete(socketId);
         }
+        this.members.delete(socketId);
     }
 
     public StartGame(config: GameConfig): void {
