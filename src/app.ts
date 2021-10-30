@@ -8,7 +8,7 @@ import session, { SessionOptions } from "express-session";
 import connectRedis from "connect-redis";
 import { RoomMessageType } from "games-common/src/enums/RoomMessageType";
 import { GameMessageType } from "games-common/src/games/dominoes/enums/GameMessageType";
-import _, { identity } from "lodash";
+import _ from "lodash";
 import { ALPHANUMERIC_NONVOWEL, GenerateId } from "@games-common/utils";
 import { GameConfig } from "@games-common/interfaces/GameConfig";
 import { RoomVisibility } from "./enums/RoomVisibility";
@@ -135,11 +135,6 @@ io.on("connection", (socket: Socket) => {
                 }
                 const room = roomIdsToRooms.get(roomId);
                 room.AddPlayerToLobby(socket.id, session.playerName);
-                io.to(roomId).emit(
-                    RoomMessageType.ROOM_DETAILS,
-                    room.RoomDetails
-                );
-                // Replace with user ID or something similar
                 socket
                     .to(roomId)
                     .emit(RoomMessageType.PLAYER_JOINED_ROOM, "user");
@@ -162,14 +157,24 @@ io.on("connection", (socket: Socket) => {
             socket.id,
             roomIdsForSocket.splice(roomIdIndex, 1)
         );
-        // Replace with user ID or something similar
-        if (room?.NPlayers > 0) {
-            io.to(roomId).emit(RoomMessageType.ROOM_DETAILS, room.RoomDetails);
-            socket.to(roomId).emit(RoomMessageType.PLAYER_LEFT_ROOM, "user");
-        } else {
+
+        if (room?.NPlayers === 0) {
             roomIdsToRooms.delete(roomId);
         }
     });
+
+    socket.on(
+        RoomMessageType.CHANGE_VISIBILITY,
+        (roomId: string, isPrivate: boolean) => {
+            const room = roomIdsToRooms.get(roomId);
+            if (room?.IsOwner(socket.id)) {
+                room.SetVisibility(
+                    isPrivate ? RoomVisibility.PRIVATE : RoomVisibility.PUBLIC
+                );
+                room.BroadcastRoomDetailsToLobby();
+            }
+        }
+    );
 });
 
 app.get(
@@ -245,29 +250,6 @@ app.post(
                 res.json({ id: roomId });
                 break;
             }
-        }
-    }
-);
-
-app.post(
-    "/setRoomVisibility",
-    (
-        req: express.Request,
-        res: express.Response,
-        next: express.NextFunction
-    ) => {
-        const roomId = req.body.roomId;
-        const isPrivate = req.body.isPrivate;
-
-        const room = roomIdsToRooms.get(roomId);
-        if (room) {
-            room.SetVisibility(
-                isPrivate ? RoomVisibility.PRIVATE : RoomVisibility.PUBLIC
-            );
-            room.BroadcastToLobby(
-                RoomMessageType.ROOM_DETAILS,
-                room.RoomDetails
-            );
         }
     }
 );

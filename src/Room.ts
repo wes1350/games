@@ -1,3 +1,4 @@
+import { RoomMessageType } from "@games-common/enums/RoomMessageType";
 import { GameConfig } from "@games-common/interfaces/GameConfig";
 import { RoomDetails } from "@games-common/interfaces/RoomDetails";
 import { ALPHANUMERIC_NONVOWEL, GenerateId } from "@games-common/utils";
@@ -27,6 +28,7 @@ export class Room {
     private id: string;
     private gameRoomId: string;
     private spectateRoomId: string;
+    private ownerSocketId: string;
     // maps socket id to member
     private members: Map<string, Member>;
 
@@ -35,6 +37,10 @@ export class Room {
         this.id = id;
         this.roomVisibility = RoomVisibility.PUBLIC;
         this.members = new Map();
+    }
+
+    public IsOwner(id: string): boolean {
+        return this.ownerSocketId === id;
     }
 
     public SetVisibility(value: RoomVisibility): void {
@@ -56,7 +62,8 @@ export class Room {
     public get RoomDetails(): RoomDetails {
         return {
             private: this.Visibility === RoomVisibility.PRIVATE,
-            players: this.GetMemberDetails(MemberType.LOBBY)
+            players: this.GetMemberDetails(MemberType.LOBBY),
+            owner: this.ownerSocketId
         };
     }
 
@@ -87,6 +94,14 @@ export class Room {
             name: playerName,
             type: MemberType.LOBBY
         });
+
+        if (!this.ownerSocketId) {
+            this.ownerSocketId = socketId;
+        }
+
+        this.BroadcastRoomDetailsToLobby();
+
+        // TODO: also broadcast that a specific player joined the room
     }
 
     public MovePlayerFromLobbyToGameRoom(socketId: string): void {
@@ -123,6 +138,16 @@ export class Room {
             this.getSocket(socketId).leave(this.spectateRoomId);
         }
         this.members.delete(socketId);
+
+        if (this.ownerSocketId === socketId) {
+            if (this.socketIds.length > 0) {
+                this.ownerSocketId = this.socketIds[0];
+                this.BroadcastRoomDetailsToLobby();
+            } else {
+                this.ownerSocketId = null;
+            }
+        }
+        // TODO: also broadcast that a specific player left the room
     }
 
     public StartGame(config: GameConfig): void {
@@ -147,6 +172,10 @@ export class Room {
             this.emitToPlayer.bind(this),
             this.queryPlayer.bind(this)
         );
+    }
+
+    public BroadcastRoomDetailsToLobby() {
+        this.BroadcastToLobby(RoomMessageType.ROOM_DETAILS, this.RoomDetails);
     }
 
     public BroadcastToLobby(type: any, payload: any) {
