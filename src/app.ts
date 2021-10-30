@@ -175,6 +175,21 @@ io.on("connection", (socket: Socket) => {
             }
         }
     );
+
+    socket.on(
+        RoomMessageType.KICK_PLAYER,
+        (roomId: string, kickedUserId: string) => {
+            console.log(`kicking player ${kickedUserId} from room ${roomId}`);
+            const room = roomIdsToRooms.get(roomId);
+            if (room?.IsOwner(socket.id)) {
+                console.log(`hello`);
+                room.RemovePlayerBySocketId(kickedUserId);
+                io.sockets.sockets
+                    .get(kickedUserId)
+                    ?.emit(RoomMessageType.PLAYER_KICKED);
+            }
+        }
+    );
 });
 
 app.get(

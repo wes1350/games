@@ -142,11 +142,12 @@ export class Room {
         if (this.ownerSocketId === socketId) {
             if (this.socketIds.length > 0) {
                 this.ownerSocketId = this.socketIds[0];
-                this.BroadcastRoomDetailsToLobby();
             } else {
                 this.ownerSocketId = null;
             }
         }
+
+        this.BroadcastRoomDetailsToLobby();
         // TODO: also broadcast that a specific player left the room
     }
 
