@@ -182,12 +182,25 @@ io.on("connection", (socket: Socket) => {
             console.log(`kicking player ${kickedUserId} from room ${roomId}`);
             const room = roomIdsToRooms.get(roomId);
             if (room?.IsOwner(socket.id)) {
-                console.log(`hello`);
                 room.RemovePlayerBySocketId(kickedUserId);
                 io.sockets.sockets
                     .get(kickedUserId)
                     ?.emit(RoomMessageType.PLAYER_KICKED);
             }
+        }
+    );
+
+    socket.on(
+        RoomMessageType.SET_READY_STATUS,
+        (roomId: string, value: boolean) => {
+            console.log(
+                `marking player ${socket.id} in room ${roomId} as ${
+                    value ? "" : "not "
+                }ready`
+            );
+            const room = roomIdsToRooms.get(roomId);
+            room.SetReadyStatus(socket.id, value);
+            room.BroadcastRoomDetailsToLobby();
         }
     );
 });
@@ -230,13 +243,18 @@ app.post(
 
 app.get(
     "/rooms",
+    // "/rooms/:gameType",
     (
         req: express.Request,
         res: express.Response,
         next: express.NextFunction
     ) => {
+        // const gameType = req.params["gameType"];
         const publicRooms = [...roomIdsToRooms].filter(
             ([_id, room]) => room.Visibility === RoomVisibility.PUBLIC
+            // ([_id, room]) =>
+            //     room.Visibility === RoomVisibility.PUBLIC &&
+            //     room.GameType === gameType
         );
 
         res.json({
@@ -256,10 +274,12 @@ app.post(
         next: express.NextFunction
     ) => {
         console.log("got a request to /createRoom");
+        // const gameType = req.body.gameType;
         const roomIds = Array.from(roomIdsToRooms.keys());
         while (true) {
             const roomId = GenerateId(ALPHANUMERIC_NONVOWEL, 4);
             if (!roomIds.includes(roomId)) {
+                // roomIdsToRooms.set(roomId, new Room(roomId, gameType, io));
                 roomIdsToRooms.set(roomId, new Room(roomId, io));
 
                 res.json({ id: roomId });

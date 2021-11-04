@@ -1,7 +1,11 @@
+import { GameType } from "@games-common/enums/GameType";
 import { RoomMessageType } from "@games-common/enums/RoomMessageType";
 import { GameConfig } from "@games-common/interfaces/GameConfig";
+import { LobbyMemberDetails } from "@games-common/interfaces/LobbyMemberDetails";
+import { PlayerDetails } from "@games-common/interfaces/PlayerDetails";
 import { RoomDetails } from "@games-common/interfaces/RoomDetails";
 import { ALPHANUMERIC_NONVOWEL, GenerateId } from "@games-common/utils";
+import _ from "lodash";
 import { Socket } from "socket.io";
 import { RoomVisibility } from "./enums/RoomVisibility";
 import { GameManager } from "./GameManager";
@@ -15,6 +19,7 @@ enum MemberType {
 interface Member {
     name: string;
     type: MemberType;
+    ready: boolean;
 }
 
 const changeType = (member: Member, type: MemberType) => {
@@ -26,21 +31,35 @@ export class Room {
     private io: any;
     private roomVisibility: RoomVisibility;
     private id: string;
+    // private gameType: GameType;
     private gameRoomId: string;
     private spectateRoomId: string;
     private ownerSocketId: string;
     // maps socket id to member
     private members: Map<string, Member>;
 
+    // constructor(id: string, gameType: GameType, io: any) {
     constructor(id: string, io: any) {
-        this.io = io;
         this.id = id;
+        // this.gameType = gameType;
+        this.io = io;
         this.roomVisibility = RoomVisibility.PUBLIC;
         this.members = new Map();
     }
 
+    // public get GameType(): GameType {
+    //     return this.gameType;
+    // }
+
     public IsOwner(id: string): boolean {
         return this.ownerSocketId === id;
+    }
+
+    public SetReadyStatus(socketId: string, value: boolean): void {
+        this.members.set(socketId, {
+            ...this.members.get(socketId),
+            ready: value
+        });
     }
 
     public SetVisibility(value: RoomVisibility): void {
@@ -62,7 +81,7 @@ export class Room {
     public get RoomDetails(): RoomDetails {
         return {
             private: this.Visibility === RoomVisibility.PRIVATE,
-            players: this.GetMemberDetails(MemberType.LOBBY),
+            players: this.GetLobbyMemberDetails(MemberType.LOBBY),
             owner: this.ownerSocketId
         };
     }
@@ -73,7 +92,15 @@ export class Room {
         );
     }
 
-    public GetMemberDetails(type: MemberType): { id: string; name: string }[] {
+    public GetLobbyMemberDetails(type: MemberType): LobbyMemberDetails[] {
+        return [...this.getMembersByType(type)].map((entry) => ({
+            id: entry[0],
+            name: entry[1].name,
+            ready: entry[1].ready
+        }));
+    }
+
+    public GetPlayerDetails(type: MemberType): PlayerDetails[] {
         return [...this.getMembersByType(type)].map((entry) => ({
             id: entry[0],
             name: entry[1].name
@@ -92,7 +119,8 @@ export class Room {
         this.getSocket(socketId).join(this.id);
         this.members.set(socketId, {
             name: playerName,
-            type: MemberType.LOBBY
+            type: MemberType.LOBBY,
+            ready: false
         });
 
         if (!this.ownerSocketId) {
@@ -154,6 +182,18 @@ export class Room {
     public StartGame(config: GameConfig): void {
         console.log("config:", config);
 
+        if (
+            _.some(
+                [...this.getMembersByType(MemberType.LOBBY)].map(
+                    ([_key, member]) => !member.ready
+                )
+            )
+        ) {
+            // TODO: Send a message to the owner saying not everyone is ready
+            // Or, maybe just detect this and disable "start game" in the frontend
+            return;
+        }
+
         const randomId = GenerateId(ALPHANUMERIC_NONVOWEL, 16);
         // TODO: Should clear out previous game/spectator rooms to avoid unused rooms building up
         // Not immediately though, since people may still want to chat post-game
@@ -168,7 +208,7 @@ export class Room {
 
         GameManager.RunGame(
             config,
-            this.GetMemberDetails(MemberType.PLAYER),
+            this.GetPlayerDetails(MemberType.PLAYER),
             this.broadcastToPlayers.bind(this),
             this.emitToPlayer.bind(this),
             this.queryPlayer.bind(this)
